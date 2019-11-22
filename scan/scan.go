@@ -6,8 +6,7 @@ import (
 )
 
 // Queryer is the interface required by functions in the scan package.
-//
-// It is a copy of sql/driver.QueryerContext.
 type Queryer interface {
+	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
 	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
 }
