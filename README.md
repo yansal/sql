@@ -1,5 +1,6 @@
 # sql
 
-* sql/hooks: insert hooks at the connection level, useful for instrumenting
-* sql/query: programatically build sql queries with parameters
+* sql/hooks: hook into the connection, useful for instrumenting
 * sql/scan: scan rows to maps and structs
+
+TODO: build commands, nested tx via savepoint, preloads
