@@ -13,7 +13,7 @@ func (c *mockConnector) Driver() driver.Driver                        { return n
 
 type mockConn struct{}
 
-func (c *mockConn) Begin() (driver.Tx, error)           { return nil, nil }
+func (c *mockConn) Begin() (driver.Tx, error)           { return &mockTx{}, nil }
 func (c *mockConn) Close() error                        { return nil }
 func (c *mockConn) Prepare(string) (driver.Stmt, error) { return &mockStmt{}, nil }
 
@@ -26,6 +26,11 @@ func (c *mockConn) ExecContext(context.Context, string, []driver.NamedValue) (dr
 func (c *mockConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
 	return nil, nil
 }
+
+type mockTx struct{}
+
+func (tx *mockTx) Commit() error   { return nil }
+func (tx *mockTx) Rollback() error { return nil }
 
 type mockStmt struct{}
 
@@ -212,5 +217,38 @@ func TestQueryerContextHook(t *testing.T) {
 
 	if !ok {
 		t.Error("expected QueryHook to be called")
+	}
+}
+
+func TestBeginCommitRollbackHook(t *testing.T) {
+	connector := NewConnector(&mockConnector{})
+	var begin, commit, rollback bool
+	connector.BeginHook = func(context.Context, BeginInfo) { begin = true }
+	connector.CommitHook = func(CommitInfo) { commit = true }
+	connector.RollbackHook = func(RollbackInfo) { rollback = true }
+
+	ctx := context.Background()
+	conn, err := connector.Connect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := conn.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !begin {
+		t.Error("expected BeginHook to be called")
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if !commit {
+		t.Error("expected CommitHook to be called")
+	}
+	if err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if !rollback {
+		t.Error("expected RollbackHook to be called")
 	}
 }

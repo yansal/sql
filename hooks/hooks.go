@@ -14,7 +14,11 @@ type Connector struct {
 	ExecHook  func(ctx context.Context, info ExecInfo)
 	QueryHook func(ctx context.Context, info QueryInfo)
 
-	// TODO: add ConnectHook, BeginHook, PrepareHook, etc.
+	BeginHook    func(ctx context.Context, info BeginInfo)
+	CommitHook   func(info CommitInfo)
+	RollbackHook func(info RollbackInfo)
+
+	// TODO: add ConnectHook, PrepareHook, etc.
 
 	wrapped driver.Connector
 }
@@ -33,6 +37,24 @@ type QueryInfo struct {
 	Err      error
 }
 
+// BeginInfo is the argument of BeginHook.
+type BeginInfo struct {
+	Duration time.Duration
+	Err      error
+}
+
+// CommitInfo is the argument of CommitHook.
+type CommitInfo struct {
+	Duration time.Duration
+	Err      error
+}
+
+// RollbackInfo is the argument of RollbackHook.
+type RollbackInfo struct {
+	Duration time.Duration
+	Err      error
+}
+
 // Connect implements database/sql/driver.Connector.
 func (connector *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	c, err := connector.wrapped.Connect(ctx)
@@ -40,9 +62,12 @@ func (connector *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, err
 	}
 	return &conn{
-		wrapped:   c,
-		execHook:  connector.ExecHook,
-		queryHook: connector.QueryHook,
+		wrapped:      c,
+		execHook:     connector.ExecHook,
+		queryHook:    connector.QueryHook,
+		beginHook:    connector.BeginHook,
+		commitHook:   connector.CommitHook,
+		rollbackHook: connector.RollbackHook,
 	}, nil
 }
 
@@ -50,13 +75,28 @@ func (connector *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 func (connector *Connector) Driver() driver.Driver { return connector.wrapped.Driver() }
 
 type conn struct {
-	wrapped   driver.Conn
-	execHook  func(ctx context.Context, info ExecInfo)
-	queryHook func(ctx context.Context, info QueryInfo)
+	wrapped      driver.Conn
+	execHook     func(ctx context.Context, info ExecInfo)
+	queryHook    func(ctx context.Context, info QueryInfo)
+	beginHook    func(ctx context.Context, info BeginInfo)
+	commitHook   func(info CommitInfo)
+	rollbackHook func(info RollbackInfo)
 }
 
 func (c *conn) Begin() (driver.Tx, error) {
-	return c.wrapped.Begin()
+	start := time.Now()
+	t, err := c.wrapped.Begin()
+	if c.beginHook != nil {
+		c.beginHook(context.Background(), BeginInfo{
+			Duration: time.Since(start),
+			Err:      err,
+		})
+	}
+	return &tx{
+		wrapped:      t,
+		commitHook:   c.commitHook,
+		rollbackHook: c.rollbackHook,
+	}, nil
 }
 
 func (c *conn) Close() error {
@@ -139,6 +179,30 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		})
 	}
 	return rows, err
+}
+
+type tx struct {
+	wrapped      driver.Tx
+	commitHook   func(info CommitInfo)
+	rollbackHook func(info RollbackInfo)
+}
+
+func (tx *tx) Commit() error {
+	start := time.Now()
+	err := tx.wrapped.Commit()
+	if tx.commitHook != nil {
+		tx.commitHook(CommitInfo{Duration: time.Since(start), Err: err})
+	}
+	return err
+}
+
+func (tx *tx) Rollback() error {
+	start := time.Now()
+	err := tx.wrapped.Rollback()
+	if tx.rollbackHook != nil {
+		tx.rollbackHook(RollbackInfo{Duration: time.Since(start), Err: err})
+	}
+	return err
 }
 
 type stmt struct {
