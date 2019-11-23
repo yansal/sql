@@ -3,75 +3,208 @@ package hooks
 import (
 	"context"
 	"database/sql/driver"
+	"time"
 )
 
+// NewConnector returns a new Connector.
+func NewConnector(wrapped driver.Connector) *Connector { return &Connector{wrapped: wrapped} }
+
+// A Connector wraps an existing connector.
 type Connector struct {
-	ConnectHook func(context.Context) (driver.Conn, error)
-	Wrapped     driver.Connector
+	ExecHook  func(ctx context.Context, info ExecInfo)
+	QueryHook func(ctx context.Context, info QueryInfo)
+
+	// TODO: add ConnectHook, BeginHook, PrepareHook, etc.
+
+	wrapped driver.Connector
 }
 
-func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
-	if c.ConnectHook != nil {
-		return c.ConnectHook(ctx)
+// ExecInfo is the argument of ExecHook and contains information about the executed query.
+type ExecInfo struct {
+	Query    string
+	Duration time.Duration
+	Err      error
+}
+
+// QueryInfo is the argument of QueryHook and contains information about the executed query.
+type QueryInfo struct {
+	Query    string
+	Duration time.Duration
+	Err      error
+}
+
+// Connect implements database/sql/driver.Connector.
+func (connector *Connector) Connect(ctx context.Context) (driver.Conn, error) {
+	c, err := connector.wrapped.Connect(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return c.Wrapped.Connect(ctx)
+	return &conn{
+		wrapped:   c,
+		execHook:  connector.ExecHook,
+		queryHook: connector.QueryHook,
+	}, nil
 }
 
-func (c *Connector) Driver() driver.Driver { return c.Wrapped.Driver() }
+// Driver implements database/sql/driver.Connector.
+func (connector *Connector) Driver() driver.Driver { return connector.wrapped.Driver() }
 
-type Conn struct {
-	ExecHook  func(ctx context.Context, query string, values []driver.NamedValue) (driver.Result, error)
-	QueryHook func(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error)
-	Wrapped   driver.Conn
+type conn struct {
+	wrapped   driver.Conn
+	execHook  func(ctx context.Context, info ExecInfo)
+	queryHook func(ctx context.Context, info QueryInfo)
 }
 
-func (c *Conn) Begin() (driver.Tx, error) {
-	return c.Wrapped.Begin()
+func (c *conn) Begin() (driver.Tx, error) {
+	return c.wrapped.Begin()
 }
 
-func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	return c.Wrapped.(driver.ConnBeginTx).BeginTx(ctx, opts)
+func (c *conn) Close() error {
+	return c.wrapped.Close()
 }
 
-func (c *Conn) Close() error {
-	return c.Wrapped.Close()
-}
-
-func (c *Conn) Prepare(s string) (driver.Stmt, error) {
-	return c.Wrapped.Prepare(s)
-}
-
-func (c *Conn) Ping(ctx context.Context) error {
-	return c.Wrapped.(driver.Pinger).Ping(ctx)
-}
-
-func (c *Conn) Exec(query string, values []driver.Value) (driver.Result, error) {
-	return c.Wrapped.(driver.Execer).Exec(query, values)
-}
-
-func (c *Conn) ExecContext(ctx context.Context, query string, values []driver.NamedValue) (driver.Result, error) {
-	if c.ExecHook != nil {
-		return c.ExecHook(ctx, query, values)
+func (c *conn) Prepare(query string) (driver.Stmt, error) {
+	s, err := c.wrapped.Prepare(query)
+	if err != nil {
+		return nil, err
 	}
-	return c.Wrapped.(driver.ExecerContext).ExecContext(ctx, query, values)
-}
-
-func (c *Conn) Query(query string, args []driver.Value) (driver.Rows, error) {
-	return c.Wrapped.(driver.Queryer).Query(query, args)
-}
-
-func (c *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	if c.QueryHook != nil {
-		return c.QueryHook(ctx, query, args)
-	}
-	return c.Wrapped.(driver.QueryerContext).QueryContext(ctx, query, args)
+	return &stmt{
+		wrapped:   s,
+		query:     query,
+		execHook:  c.execHook,
+		queryHook: c.queryHook,
+	}, nil
 }
 
 var (
-	_ driver.ConnBeginTx    = &Conn{}
-	_ driver.Pinger         = &Conn{}
-	_ driver.Execer         = &Conn{}
-	_ driver.ExecerContext  = &Conn{}
-	_ driver.Queryer        = &Conn{}
-	_ driver.QueryerContext = &Conn{}
+	_ driver.Execer         = &conn{}
+	_ driver.ExecerContext  = &conn{}
+	_ driver.Queryer        = &conn{}
+	_ driver.QueryerContext = &conn{}
+
+	// _ driver.ConnBeginTx = &conn{}
+	// _ driver.ConnPrepareContext = &conn{}
+	// _ driver.NamedValueChecker      = &conn{}
+	// _ driver.Pinger      = &conn{}
+	// _ driver.SessionResetter = &conn{}
 )
+
+func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
+	start := time.Now()
+	res, err := c.wrapped.(driver.Execer).Exec(query, args)
+	if c.execHook != nil {
+		c.execHook(context.Background(), ExecInfo{
+			Query:    query,
+			Duration: time.Since(start),
+			Err:      err,
+		})
+	}
+	return res, err
+}
+
+func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	start := time.Now()
+	res, err := c.wrapped.(driver.ExecerContext).ExecContext(ctx, query, args)
+	if c.execHook != nil {
+		c.execHook(ctx, ExecInfo{
+			Query:    query,
+			Duration: time.Since(start),
+			Err:      err,
+		})
+	}
+	return res, err
+}
+
+func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
+	start := time.Now()
+	res, err := c.wrapped.(driver.Queryer).Query(query, args)
+	if c.queryHook != nil {
+		c.queryHook(context.Background(), QueryInfo{
+			Query:    query,
+			Duration: time.Since(start),
+			Err:      err,
+		})
+	}
+	return res, err
+}
+
+func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	start := time.Now()
+	rows, err := c.wrapped.(driver.QueryerContext).QueryContext(ctx, query, args)
+	if c.queryHook != nil {
+		c.queryHook(ctx, QueryInfo{
+			Query:    query,
+			Duration: time.Since(start),
+			Err:      err,
+		})
+	}
+	return rows, err
+}
+
+type stmt struct {
+	wrapped   driver.Stmt
+	query     string
+	execHook  func(ctx context.Context, info ExecInfo)
+	queryHook func(ctx context.Context, info QueryInfo)
+}
+
+func (s *stmt) Close() error { return s.wrapped.Close() }
+func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
+	start := time.Now()
+	res, err := s.wrapped.Exec(args)
+	if s.execHook != nil {
+		s.execHook(context.Background(), ExecInfo{
+			Query:    s.query,
+			Duration: time.Since(start),
+			Err:      err,
+		})
+	}
+	return res, err
+}
+func (s *stmt) NumInput() int { return s.wrapped.NumInput() }
+func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
+	start := time.Now()
+	res, err := s.wrapped.Query(args)
+	if s.queryHook != nil {
+		s.queryHook(context.Background(), QueryInfo{
+			Query:    s.query,
+			Duration: time.Since(start),
+			Err:      err,
+		})
+	}
+	return res, err
+}
+
+var (
+	_ driver.StmtExecContext  = &stmt{}
+	_ driver.StmtQueryContext = &stmt{}
+
+	// _ driver.ColumnConverter = &stmt{}
+	// _ driver.NamedValueChecker = &stmt{}
+)
+
+func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	start := time.Now()
+	res, err := s.wrapped.(driver.StmtExecContext).ExecContext(ctx, args)
+	if s.execHook != nil {
+		s.execHook(ctx, ExecInfo{
+			Query:    s.query,
+			Duration: time.Since(start),
+			Err:      err,
+		})
+	}
+	return res, err
+}
+
+func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	start := time.Now()
+	rows, err := s.wrapped.(driver.StmtQueryContext).QueryContext(ctx, args)
+	if s.queryHook != nil {
+		s.queryHook(ctx, QueryInfo{
+			Query:    s.query,
+			Duration: time.Since(start),
+			Err:      err,
+		})
+	}
+	return rows, err
+}
