@@ -1,16 +1,9 @@
 package scan
 
-import (
-	"context"
-)
+import "database/sql"
 
-// QueryMapSlice runs query with args and returns the rows scanned into a []map[string]interface{} value.
-func QueryMapSlice(ctx context.Context, db Queryer, query string, args ...interface{}) ([]map[string]interface{}, error) {
-	rows, err := db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-
+// MapSlice returns rows scanned into a []map[string]interface{} value.
+func MapSlice(rows *sql.Rows) ([]map[string]interface{}, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, err

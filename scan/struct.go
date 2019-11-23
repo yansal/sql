@@ -1,14 +1,13 @@
 package scan
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"reflect"
 )
 
-// QueryStructSlice runs query with args and scans rows to dest, which must be a pointer to a slice of structs.
-func QueryStructSlice(ctx context.Context, db Queryer, dest interface{}, query string, args ...interface{}) error {
+// StructSlice scans rows to dest, which must be a pointer to a slice of structs.
+func StructSlice(rows *sql.Rows, dest interface{}) error {
 	slicevalue := reflect.ValueOf(dest).Elem()
 	structtype := slicevalue.Type().Elem()
 
@@ -16,12 +15,6 @@ func QueryStructSlice(ctx context.Context, db Queryer, dest interface{}, query s
 	for i := 0; i < structtype.NumField(); i++ {
 		structfields = append(structfields, structtype.Field(i))
 	}
-
-	rows, err := db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -58,8 +51,8 @@ func QueryStructSlice(ctx context.Context, db Queryer, dest interface{}, query s
 	return rows.Err()
 }
 
-// QueryStruct runs query with args and scans the row to dest, which must be a pointer to struct.
-func QueryStruct(ctx context.Context, db Queryer, dest interface{}, query string, args ...interface{}) error {
+// Struct scans rows to dest, which must be a pointer to struct. Struct returns sql.ErrNoRows is there are no rows.
+func Struct(rows *sql.Rows, dest interface{}) error {
 	structvalue := reflect.ValueOf(dest).Elem()
 	structtype := structvalue.Type()
 
@@ -67,12 +60,6 @@ func QueryStruct(ctx context.Context, db Queryer, dest interface{}, query string
 	for i := 0; i < structtype.NumField(); i++ {
 		fields = append(fields, structtype.Field(i))
 	}
-
-	rows, err := db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
 
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
@@ -104,5 +91,5 @@ func QueryStruct(ctx context.Context, db Queryer, dest interface{}, query string
 	if err := rows.Scan(dests...); err != nil {
 		return err
 	}
-	return rows.Close()
+	return nil
 }

@@ -1,7 +1,6 @@
 package scan
 
 import (
-	"context"
 	"database/sql"
 	"database/sql/driver"
 	"testing"
@@ -15,35 +14,7 @@ type T struct {
 	Null   interface{} `scan:"null"`
 }
 
-func TestQueryStruct(t *testing.T) {
-	ctx := context.Background()
-
-	now := time.Now()
-	db := sql.OpenDB(&mockConnector{conn: &mockConn{stmt: &mockStmt{rows: &mockRows{
-		columns: []string{"int", "string", "time", "null"},
-		values:  [][]driver.Value{{1, "hello", now, nil}},
-	}}}})
-	var dest T
-	if err := QueryStruct(ctx, db, &dest, ""); err != nil {
-		t.Fatal(err)
-	}
-	if dest.Int != 1 {
-		t.Errorf("expected 1, got %d", dest.Int)
-	}
-	if dest.String != "hello" {
-		t.Errorf(`expected "hello", got %s`, dest.String)
-	}
-	if dest.Time != now {
-		t.Errorf(`expected now, got %s`, dest.Time)
-	}
-	if dest.Null != nil {
-		t.Errorf(`expected nil, got %s`, dest.Null)
-	}
-}
-
-func TestQueryStructSlice(t *testing.T) {
-	ctx := context.Background()
-
+func TestStructSlice(t *testing.T) {
 	now := time.Now()
 	db := sql.OpenDB(&mockConnector{conn: &mockConn{stmt: &mockStmt{rows: &mockRows{
 		columns: []string{"int", "string", "time", "null"},
@@ -52,8 +23,13 @@ func TestQueryStructSlice(t *testing.T) {
 			{2, "world", now.Add(time.Second), nil},
 		},
 	}}}})
+	rows, err := db.Query("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	var dest []T
-	if err := QueryStructSlice(ctx, db, &dest, ""); err != nil {
+	if err := StructSlice(rows, &dest); err != nil {
 		t.Fatal(err)
 	}
 	if len(dest) != 2 {
@@ -82,5 +58,34 @@ func TestQueryStructSlice(t *testing.T) {
 	}
 	if dest[1].Null != nil {
 		t.Errorf(`expected nil, got %s`, dest[1].Null)
+	}
+}
+
+func TestStruct(t *testing.T) {
+	now := time.Now()
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{stmt: &mockStmt{rows: &mockRows{
+		columns: []string{"int", "string", "time", "null"},
+		values:  [][]driver.Value{{1, "hello", now, nil}},
+	}}}})
+	rows, err := db.Query("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var dest T
+	if err := Struct(rows, &dest); err != nil {
+		t.Fatal(err)
+	}
+	if dest.Int != 1 {
+		t.Errorf("expected 1, got %d", dest.Int)
+	}
+	if dest.String != "hello" {
+		t.Errorf(`expected "hello", got %s`, dest.String)
+	}
+	if dest.Time != now {
+		t.Errorf(`expected now, got %s`, dest.Time)
+	}
+	if dest.Null != nil {
+		t.Errorf(`expected nil, got %s`, dest.Null)
 	}
 }

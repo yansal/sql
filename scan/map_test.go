@@ -1,16 +1,13 @@
 package scan
 
 import (
-	"context"
 	"database/sql"
 	"database/sql/driver"
 	"testing"
 	"time"
 )
 
-func TestQueryMap(t *testing.T) {
-	ctx := context.Background()
-
+func TestMapSlice(t *testing.T) {
 	now := time.Now()
 	db := sql.OpenDB(&mockConnector{conn: &mockConn{stmt: &mockStmt{rows: &mockRows{
 		columns: []string{"int", "string", "time", "null"},
@@ -19,7 +16,12 @@ func TestQueryMap(t *testing.T) {
 			{2, "world", now.Add(time.Second), nil},
 		},
 	}}}})
-	maps, err := QueryMapSlice(ctx, db, "")
+	rows, err := db.Query("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	maps, err := MapSlice(rows)
 	if err != nil {
 		t.Fatal(err)
 	}
