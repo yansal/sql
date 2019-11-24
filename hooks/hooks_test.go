@@ -47,7 +47,7 @@ func (s *mockStmt) QueryContext(context.Context, []driver.NamedValue) (driver.Ro
 }
 
 func TestExecHook(t *testing.T) {
-	connector := NewConnector(&mockConnector{})
+	connector := Wrap(&mockConnector{})
 	var ok bool
 	connector.ExecHook = func(context.Context, ExecInfo) { ok = true }
 
@@ -71,7 +71,7 @@ func TestExecHook(t *testing.T) {
 }
 
 func TestQueryHook(t *testing.T) {
-	connector := NewConnector(&mockConnector{})
+	connector := Wrap(&mockConnector{})
 	var ok bool
 	connector.QueryHook = func(context.Context, QueryInfo) { ok = true }
 
@@ -95,7 +95,7 @@ func TestQueryHook(t *testing.T) {
 }
 
 func TestStmtExecContextHook(t *testing.T) {
-	connector := NewConnector(&mockConnector{})
+	connector := Wrap(&mockConnector{})
 	var ok bool
 	connector.ExecHook = func(context.Context, ExecInfo) { ok = true }
 
@@ -119,7 +119,7 @@ func TestStmtExecContextHook(t *testing.T) {
 }
 
 func TestStmtQueryContextHook(t *testing.T) {
-	connector := NewConnector(&mockConnector{})
+	connector := Wrap(&mockConnector{})
 	var ok bool
 	connector.QueryHook = func(context.Context, QueryInfo) { ok = true }
 
@@ -143,7 +143,7 @@ func TestStmtQueryContextHook(t *testing.T) {
 }
 
 func TestExecerHook(t *testing.T) {
-	connector := NewConnector(&mockConnector{})
+	connector := Wrap(&mockConnector{})
 	var ok bool
 	connector.ExecHook = func(context.Context, ExecInfo) { ok = true }
 
@@ -163,7 +163,7 @@ func TestExecerHook(t *testing.T) {
 }
 
 func TestQueryerHook(t *testing.T) {
-	connector := NewConnector(&mockConnector{})
+	connector := Wrap(&mockConnector{})
 	var ok bool
 	connector.QueryHook = func(context.Context, QueryInfo) { ok = true }
 
@@ -182,7 +182,7 @@ func TestQueryerHook(t *testing.T) {
 }
 
 func TestExecerContextHook(t *testing.T) {
-	connector := NewConnector(&mockConnector{})
+	connector := Wrap(&mockConnector{})
 	var ok bool
 	connector.ExecHook = func(context.Context, ExecInfo) { ok = true }
 
@@ -202,7 +202,7 @@ func TestExecerContextHook(t *testing.T) {
 }
 
 func TestQueryerContextHook(t *testing.T) {
-	connector := NewConnector(&mockConnector{})
+	connector := Wrap(&mockConnector{})
 	var ok bool
 	connector.QueryHook = func(context.Context, QueryInfo) { ok = true }
 
@@ -221,7 +221,7 @@ func TestQueryerContextHook(t *testing.T) {
 }
 
 func TestBeginCommitRollbackHook(t *testing.T) {
-	connector := NewConnector(&mockConnector{})
+	connector := Wrap(&mockConnector{})
 	var begin, commit, rollback bool
 	connector.BeginHook = func(context.Context, BeginInfo) { begin = true }
 	connector.CommitHook = func(CommitInfo) { commit = true }

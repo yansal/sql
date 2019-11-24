@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// NewConnector returns a new Connector.
-func NewConnector(wrapped driver.Connector) *Connector { return &Connector{wrapped: wrapped} }
+// Wrap returns a new Connector wrapping c.
+func Wrap(c driver.Connector) *Connector { return &Connector{wrapped: c} }
 
 // A Connector wraps an existing connector.
 type Connector struct {
