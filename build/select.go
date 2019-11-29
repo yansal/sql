@@ -94,18 +94,18 @@ func (f from) build(b *builder) {
 }
 
 // Join returns a new from item with a join clause.
-func Join(left interface{}, right interface{}, condition interface{}) *FromJoin {
-	return &FromJoin{left: left, right: right, condition: condition}
+func Join(left interface{}, right interface{}, condition interface{}) interface{} {
+	return &join{left: left, right: right, condition: condition}
 }
 
-// A FromJoin is a from item with a join clause.
-type FromJoin struct {
+// A join is a from item with a join clause.
+type join struct {
 	left      interface{}
 	right     interface{}
 	condition interface{}
 }
 
-func (i *FromJoin) build(b *builder) {
+func (i *join) build(b *builder) {
 	b.build(i.left)
 
 	if i.right == nil || i.condition == nil {
