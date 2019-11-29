@@ -29,27 +29,6 @@ func (b *builder) bind(value interface{}) {
 	}
 }
 
-func (b *builder) build(i interface{}) {
-	switch v := i.(type) {
-	case int, int64:
-		b.write(fmt.Sprintf("%v", v))
-	case string:
-		b.write(v) // TODO: quote? how to make a distinction between a column name, a string constant, a function call?
-	case *SelectCmd:
-		b.write("(")
-		v.build(b)
-		b.write(")")
-	case expression:
-		v.build(b)
-	default:
-		panic(fmt.Sprintf("don't know how to build value %#v (%T)", v, v))
-	}
-}
-
 func (b *builder) write(s string) {
 	b.buf.WriteString(s)
-}
-
-type expression interface {
-	build(*builder)
 }
