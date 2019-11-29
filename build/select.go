@@ -175,7 +175,7 @@ func (a AsExpr) build(b *builder) {
 	b.write(" AS " + a.alias)
 }
 
-func OrderExpr(expr interface{}, ordering string) *orderExpr {
+func OrderExpr(expr interface{}, ordering string) interface{} {
 	return &orderExpr{expr: expr, ordering: ordering}
 }
 
