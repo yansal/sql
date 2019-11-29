@@ -193,6 +193,6 @@ func (o orderExpr) build(b *builder) {
 }
 
 const (
-	ASC  = "ASC"
+	Asc  = "ASC"
 	Desc = "DESC"
 )
