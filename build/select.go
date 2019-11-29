@@ -1,42 +1,54 @@
 package build
 
-// Select returns a new select statement.
-func Select(exprs ...interface{}) *SelectStmt {
-	return &SelectStmt{exprs: exprs}
+// Select returns a new select command.
+func Select(exprs ...interface{}) *SelectCmd {
+	return &SelectCmd{exprs: exprs}
 }
 
 // From adds a from clause.
-func (stmt *SelectStmt) From(items ...interface{}) *SelectStmt {
+func (stmt *SelectCmd) From(items ...interface{}) *SelectCmd {
 	stmt.from = &from{items: items}
 	return stmt
 }
 
 // Where adds a where clause.
-func (stmt *SelectStmt) Where(condition interface{}) *SelectStmt {
+func (stmt *SelectCmd) Where(condition interface{}) *SelectCmd {
 	stmt.where = &where{condition: condition}
 	return stmt
 }
 
 // GroupBy adds a group by clause.
-func (stmt *SelectStmt) GroupBy(elements ...interface{}) *SelectStmt {
+func (stmt *SelectCmd) GroupBy(elements ...interface{}) *SelectCmd {
 	stmt.groupby = &groupby{elements: elements}
 	return stmt
 }
 
 // OrderBy adds a order by clause.
-func (stmt *SelectStmt) OrderBy(exprs ...interface{}) *SelectStmt {
+func (stmt *SelectCmd) OrderBy(exprs ...interface{}) *SelectCmd {
 	stmt.orderby = &orderby{exprs: exprs}
 	return stmt
 }
 
+// Limit adds a limit clause.
+func (stmt *SelectCmd) Limit(count interface{}) *SelectCmd {
+	stmt.limit = &limit{count: count}
+	return stmt
+}
+
+// Offset adds a offset clause.
+func (stmt *SelectCmd) Offset(start interface{}) *SelectCmd {
+	stmt.offset = &offset{start: start}
+	return stmt
+}
+
 // Build builds stmt and its parameters.
-func (stmt *SelectStmt) Build() (string, []interface{}) {
+func (stmt *SelectCmd) Build() (string, []interface{}) {
 	b := new(builder)
 	stmt.build(b)
 	return b.buf.String(), b.params
 }
 
-func (stmt *SelectStmt) build(b *builder) {
+func (stmt *SelectCmd) build(b *builder) {
 	b.write("SELECT ")
 	stmt.exprs.build(b)
 
@@ -59,15 +71,27 @@ func (stmt *SelectStmt) build(b *builder) {
 		b.write(" ")
 		stmt.orderby.build(b)
 	}
+
+	if stmt.limit != nil {
+		b.write(" ")
+		stmt.limit.build(b)
+	}
+
+	if stmt.offset != nil {
+		b.write(" ")
+		stmt.offset.build(b)
+	}
 }
 
-// A SelectStmt is a select statement.
-type SelectStmt struct {
+// A SelectCmd is a select statement.
+type SelectCmd struct {
 	exprs   selectexprs
 	from    *from
 	where   *where
 	groupby *groupby
 	orderby *orderby
+	limit   *limit
+	offset  *offset
 }
 
 type selectexprs []interface{}
@@ -149,14 +173,24 @@ func (o orderby) build(b *builder) {
 	}
 }
 
-type order struct {
-	expr     interface{}
-	ordering string
+type limit struct{ count interface{} }
+
+func (l limit) build(b *builder) {
+	b.write("LIMIT ")
+	b.build(l.count)
+}
+
+type offset struct{ start interface{} }
+
+func (l offset) build(b *builder) {
+	b.write("OFFSET ")
+	b.build(l.start)
 }
 
 func ColumnExpr(expr interface{}) *AsExpr {
 	return &AsExpr{expr: expr}
 }
+
 func FromExpr(expr interface{}) *AsExpr {
 	return &AsExpr{expr: expr}
 }
