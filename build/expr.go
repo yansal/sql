@@ -58,6 +58,11 @@ func (i *InfixExpr) LessThan(right interface{}) *InfixExpr {
 	return i.Op("<", right)
 }
 
+// GreaterThan invokes the > operator.
+func (i *InfixExpr) GreaterThan(right interface{}) *InfixExpr {
+	return i.Op(">", right)
+}
+
 // Op invokes an operator.
 func (i *InfixExpr) Op(op string, right interface{}) *InfixExpr {
 	return &InfixExpr{left: &InfixExpr{left: i.left, op: op, right: right}}
