@@ -105,7 +105,7 @@ func (e callExpr) build(b *builder) {
 	b.write(")")
 }
 
-func Identifier(s string) Expression { return identifier(s) }
+func Ident(s string) Expression { return identifier(s) }
 
 type identifier string
 

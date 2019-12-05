@@ -8,42 +8,42 @@ func TestSelect(t *testing.T) {
 		out  string
 		args []interface{}
 	}{{
-		cmd: Select(Columns("foo", "bar")...).From(Identifier("table")).
-			Where(Infix(Identifier("foo")).In(Bind([]string{"hello", "world"}))),
+		cmd: Select(Columns("foo", "bar")...).From(Ident("table")).
+			Where(Infix(Ident("foo")).In(Bind([]string{"hello", "world"}))),
 		out:  `SELECT "foo", "bar" FROM "table" WHERE "foo" IN ($1, $2)`,
 		args: []interface{}{"hello", "world"},
 	}, {
-		cmd: Select(Columns("foo")...).From(Identifier("bar")).
-			Where(Infix(Identifier("foo")).IsNull()),
+		cmd: Select(Columns("foo")...).From(Ident("bar")).
+			Where(Infix(Ident("foo")).IsNull()),
 		out: `SELECT "foo" FROM "bar" WHERE "foo" IS NULL`,
 	}, {
 		cmd:  Select(CallExpr("foo", Bind("hello"), Int(123))),
 		out:  `SELECT foo($1, 123)`,
 		args: []interface{}{"hello"},
 	}, {
-		cmd: Select(Columns("foo")...).From(Identifier("bar")).Limit(Int(1)).Offset(Int(2)),
+		cmd: Select(Columns("foo")...).From(Ident("bar")).Limit(Int(1)).Offset(Int(2)),
 		out: `SELECT "foo" FROM "bar" LIMIT 1 OFFSET 2`,
 	}, {
-		cmd:  Select(Columns("foo")...).From(Identifier("bar")).Limit(Bind(1)).Offset(Bind(2)),
+		cmd:  Select(Columns("foo")...).From(Ident("bar")).Limit(Bind(1)).Offset(Bind(2)),
 		out:  `SELECT "foo" FROM "bar" LIMIT $1 OFFSET $2`,
 		args: []interface{}{1, 2},
 	}, {
-		cmd: Select(CallExpr("count", Star), Identifier("foo")).From(Identifier("bar")).GroupBy(Identifier("foo")),
+		cmd: Select(CallExpr("count", Star), Ident("foo")).From(Ident("bar")).GroupBy(Ident("foo")),
 		out: `SELECT count(*), "foo" FROM "bar" GROUP BY "foo"`,
 	}, {
 		cmd: Select(Columns("t1.foo", "t2.bar")...).
 			From(Join(
-				Identifier("t1"),
-				Identifier("t2"),
-				Infix(Identifier("t1.user_id")).Equal(Identifier("t2.id")),
+				Ident("t1"),
+				Ident("t2"),
+				Infix(Ident("t1.user_id")).Equal(Ident("t2.id")),
 			)),
 		out: `SELECT "t1.foo", "t2.bar" FROM "t1" JOIN "t2" ON "t1.user_id" = "t2.id"`,
 	}, {
 		cmd: Select(Columns("t1.foo", "t2.bar")...).
 			From(Join(
-				Identifier("t1"),
-				Identifier("t2"),
-				Infix(CallExpr("date_trunc", String("month"), Identifier("t1.foo"))).Equal(Identifier("t2.bar")),
+				Ident("t1"),
+				Ident("t2"),
+				Infix(CallExpr("date_trunc", String("month"), Ident("t1.foo"))).Equal(Ident("t2.bar")),
 			)),
 		out: `SELECT "t1.foo", "t2.bar" FROM "t1" JOIN "t2" ON date_trunc('month', "t1.foo") = "t2.bar"`,
 	}, {
@@ -52,26 +52,26 @@ func TestSelect(t *testing.T) {
 		out: `SELECT "now" FROM (SELECT now()) AS "now"`,
 	}, {
 		cmd: Select(
-			ColumnExpr(Identifier("foo")).As("bar"),
+			ColumnExpr(Ident("foo")).As("bar"),
 			ColumnExpr(CallExpr("now")).As("now"),
-			ColumnExpr(CallExpr("to_char", Identifier("month"), String("YYYY-MM"))).As("month"),
-			ColumnExpr(Infix(CallExpr("sum", Identifier("amount"))).Op("/", Int(100))).As("sum_amount"),
+			ColumnExpr(CallExpr("to_char", Ident("month"), String("YYYY-MM"))).As("month"),
+			ColumnExpr(Infix(CallExpr("sum", Ident("amount"))).Op("/", Int(100))).As("sum_amount"),
 		),
 		out: `SELECT "foo" AS "bar", now() AS "now", to_char("month", 'YYYY-MM') AS "month", sum("amount") / 100 AS "sum_amount"`,
 	}, {
 		cmd: Select(Columns("foo")...).From(
-			Identifier("bar"),
+			Ident("bar"),
 			FromExpr(CallExpr("websearch_to_tsquery", Bind("hello"))).As("tsquery"),
 		).OrderBy(
-			OrderExpr(CallExpr("ts_rank", Identifier("tsv"), Identifier("tsquery")), Desc),
+			OrderExpr(CallExpr("ts_rank", Ident("tsv"), Ident("tsquery")), Desc),
 		),
 		out:  `SELECT "foo" FROM "bar", websearch_to_tsquery($1) AS "tsquery" ORDER BY ts_rank("tsv", "tsquery") DESC`,
 		args: []interface{}{"hello"},
 	}, {
-		cmd: Select(Columns("foo")...).From(Identifier("bar")).OrderBy(Identifier("foo")),
+		cmd: Select(Columns("foo")...).From(Ident("bar")).OrderBy(Ident("foo")),
 		out: `SELECT "foo" FROM "bar" ORDER BY "foo"`,
 	}, {
-		cmd:  Select(Columns("foo")...).From(Identifier("bar")).OrderBy(OrderExpr(Infix(Identifier("foo")).Equal(Bind("hello")), Desc)),
+		cmd:  Select(Columns("foo")...).From(Ident("bar")).OrderBy(OrderExpr(Infix(Ident("foo")).Equal(Bind("hello")), Desc)),
 		out:  `SELECT "foo" FROM "bar" ORDER BY "foo" = $1 DESC`,
 		args: []interface{}{"hello"},
 	}} {
