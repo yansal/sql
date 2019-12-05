@@ -66,12 +66,12 @@ func (i *InfixExpr) LessThan(right Expression) *InfixExpr {
 }
 
 // GreaterThan invokes the > operator.
-func (i *InfixExpr) GreaterThan(right interface{}) *InfixExpr {
+func (i *InfixExpr) GreaterThan(right Expression) *InfixExpr {
 	return i.Op(">", right)
 }
 
 // GreaterThanOrEqualTo invokes the >= operator.
-func (i *InfixExpr) GreaterThanOrEqualTo(right interface{}) *InfixExpr {
+func (i *InfixExpr) GreaterThanOrEqualTo(right Expression) *InfixExpr {
 	return i.Op(">=", right)
 }
 
