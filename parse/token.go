@@ -1,3 +1,5 @@
+//go:generate stringer -type=tokentype
+
 package parse
 
 import (
@@ -27,12 +29,13 @@ const (
 	tokencomma
 	tokenoparen
 	tokencparen
-	tokeneq
+	tokenop
+	tokenstar
 	tokenident
 	tokenquotedident
-	tokenint
+	tokennumber
+	tokenstring
 	tokenbindvalue
-	tokenstar
 )
 
 var tokentypes = []struct {
@@ -60,21 +63,22 @@ var tokentypes = []struct {
 	{tokencomma, regexp.MustCompile(`\A(\,)`)},
 	{tokenoparen, regexp.MustCompile(`\A(\()`)},
 	{tokencparen, regexp.MustCompile(`\A(\))`)},
-	{tokeneq, regexp.MustCompile(`\A(=)`)},
-
-	// identifiers
-	{tokenident, regexp.MustCompile(`\A(\b[a-zA-Z]+\b)`)},
-	{tokenquotedident, regexp.MustCompile(`\A(\"[a-zA-Z]+\")`)},
+	{tokenop, regexp.MustCompile(`\A(=|\+)`)},
+	{tokenstar, regexp.MustCompile(`\A(\*)`)},
 
 	// literals
-	{tokenint, regexp.MustCompile(`\A(\d+)`)},
+	{tokennumber, regexp.MustCompile(`\A(\d+)`)},
+	{tokenstring, regexp.MustCompile(`\A('\w+')`)},
 	{tokenbindvalue, regexp.MustCompile(`\A(\$\d+)`)},
-	{tokenstar, regexp.MustCompile(`\A(\*)`)},
+
+	// identifiers
+	{tokenquotedident, regexp.MustCompile(`\A(\"[a-zA-Z_]+\")`)},
+	{tokenident, regexp.MustCompile(`\A(\*|\b[a-zA-Z_]+\b)`)},
 }
 
 type token struct {
-	tokentype tokentype
-	value     []byte
+	typ   tokentype
+	value []byte
 }
 
 func tokenizeOne(in []byte) (token, error) {
@@ -82,8 +86,8 @@ func tokenizeOne(in []byte) (token, error) {
 		submatches := tt.regexp.FindSubmatch(in)
 		if len(submatches) == 2 {
 			return token{
-				tokentype: tt.tokentype,
-				value:     submatches[1],
+				typ:   tt.tokentype,
+				value: submatches[1],
 			}, nil
 		}
 	}
