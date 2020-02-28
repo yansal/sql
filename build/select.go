@@ -1,89 +1,89 @@
 package build
 
-// Select returns a new select command.
+// Select returns a new SELECT command.
 func Select(exprs ...Expression) *SelectCmd {
 	return &SelectCmd{exprs: exprs}
 }
 
-// From adds a from clause.
-func (stmt *SelectCmd) From(items ...Expression) *SelectCmd {
-	stmt.from = items
-	return stmt
+// From adds a FROM clause.
+func (cmd *SelectCmd) From(items ...Expression) *SelectCmd {
+	cmd.from = items
+	return cmd
 }
 
-// Where adds a where clause.
-func (stmt *SelectCmd) Where(condition Expression) *SelectCmd {
-	stmt.where = &where{Expression: condition}
-	return stmt
+// Where adds a WHERE clause.
+func (cmd *SelectCmd) Where(condition Expression) *SelectCmd {
+	cmd.where = &where{Expression: condition}
+	return cmd
 }
 
-// GroupBy adds a group by clause.
-func (stmt *SelectCmd) GroupBy(elements ...Expression) *SelectCmd {
-	stmt.groupby = elements
-	return stmt
+// GroupBy adds a GROUP BY clause.
+func (cmd *SelectCmd) GroupBy(elements ...Expression) *SelectCmd {
+	cmd.groupby = elements
+	return cmd
 }
 
-// OrderBy adds a order by clause.
-func (stmt *SelectCmd) OrderBy(exprs ...Expression) *SelectCmd {
-	stmt.orderby = exprs
-	return stmt
+// OrderBy adds a ORDER BY clause.
+func (cmd *SelectCmd) OrderBy(exprs ...Expression) *SelectCmd {
+	cmd.orderby = exprs
+	return cmd
 }
 
-// Limit adds a limit clause.
-func (stmt *SelectCmd) Limit(count Expression) *SelectCmd {
-	stmt.limit = &limit{Expression: count}
-	return stmt
+// Limit adds a LIMIT clause.
+func (cmd *SelectCmd) Limit(count Expression) *SelectCmd {
+	cmd.limit = &limit{Expression: count}
+	return cmd
 }
 
-// Offset adds a offset clause.
-func (stmt *SelectCmd) Offset(start Expression) *SelectCmd {
-	stmt.offset = &offset{Expression: start}
-	return stmt
+// Offset adds a OFFSET clause.
+func (cmd *SelectCmd) Offset(start Expression) *SelectCmd {
+	cmd.offset = &offset{Expression: start}
+	return cmd
 }
 
-// Build builds stmt and its parameters.
-func (stmt *SelectCmd) Build() (string, []interface{}) {
+// Build builds cmd and its parameters.
+func (cmd *SelectCmd) Build() (string, []interface{}) {
 	b := new(builder)
-	stmt.build(b)
+	cmd.build(b)
 	return b.buf.String(), b.params
 }
 
-func (stmt *SelectCmd) build(b *builder) {
+func (cmd *SelectCmd) build(b *builder) {
 	b.write("SELECT ")
-	stmt.exprs.build(b)
+	cmd.exprs.build(b)
 
-	if stmt.from != nil {
+	if cmd.from != nil {
 		b.write(" ")
-		stmt.from.build(b)
+		cmd.from.build(b)
 	}
 
-	if stmt.where != nil {
+	if cmd.where != nil {
 		b.write(" ")
-		stmt.where.build(b)
+		cmd.where.build(b)
 	}
 
-	if stmt.groupby != nil {
+	if cmd.groupby != nil {
 		b.write(" ")
-		stmt.groupby.build(b)
+		cmd.groupby.build(b)
 	}
 
-	if stmt.orderby != nil {
+	if cmd.orderby != nil {
 		b.write(" ")
-		stmt.orderby.build(b)
+		cmd.orderby.build(b)
 	}
 
-	if stmt.limit != nil {
+	if cmd.limit != nil {
 		b.write(" ")
-		stmt.limit.build(b)
+		cmd.limit.build(b)
 	}
 
-	if stmt.offset != nil {
+	if cmd.offset != nil {
 		b.write(" ")
-		stmt.offset.build(b)
+		cmd.offset.build(b)
 	}
 }
 
-// A SelectCmd is a select command.
+// A SelectCmd is a SELECT command.
 type SelectCmd struct {
 	exprs   selectexprs
 	from    from
