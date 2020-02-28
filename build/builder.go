@@ -2,6 +2,7 @@ package build
 
 import (
 	"bytes"
+	"database/sql/driver"
 	"fmt"
 )
 
@@ -12,7 +13,7 @@ type builder struct {
 
 func (b *builder) bind(value interface{}) {
 	switch v := value.(type) {
-	case int, int64, string:
+	case int, int64, string, driver.Valuer:
 		b.params = append(b.params, value)
 		fmt.Fprintf(&b.buf, "$%d", len(b.params))
 	case []string:
