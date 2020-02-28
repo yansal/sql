@@ -121,6 +121,14 @@ func (i intExpr) build(b *builder) {
 	b.write(fmt.Sprintf("%d", i))
 }
 
+func Int64(i int64) Expression { return int64Expr(i) }
+
+type int64Expr int64
+
+func (i int64Expr) build(b *builder) {
+	b.write(fmt.Sprintf("%d", i))
+}
+
 func String(s string) Expression { return stringExpr(s) }
 
 type stringExpr string
