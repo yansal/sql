@@ -1,13 +1,23 @@
 package build
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestSelect(t *testing.T) {
+	now := time.Now()
 	for _, tt := range []struct {
 		cmd  *SelectCmd
 		out  string
 		args []interface{}
 	}{{
+		cmd: Select(Columns("foo")...).
+			From(Ident("table")).
+			Where(Infix(Ident("created_at")).LessThan(Bind(now))),
+		out:  `SELECT "foo" FROM "table" WHERE "created_at" < $1`,
+		args: []interface{}{now},
+	}, {
 		cmd: Select(Columns("foo", "bar")...).From(Ident("table")).
 			Where(Infix(Ident("foo")).In(Bind([]string{"hello", "world"}))),
 		out:  `SELECT "foo", "bar" FROM "table" WHERE "foo" IN ($1, $2)`,
