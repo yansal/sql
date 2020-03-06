@@ -45,6 +45,11 @@ func (i *InfixExpr) And(right Expression) *InfixExpr {
 	return i.Op("AND", right)
 }
 
+// Or invokes the OR operator.
+func (i *InfixExpr) Or(right Expression) *InfixExpr {
+	return i.Op("OR", right)
+}
+
 // Equal invokes the = operator.
 func (i *InfixExpr) Equal(right Expression) *InfixExpr {
 	return i.Op("=", right)
