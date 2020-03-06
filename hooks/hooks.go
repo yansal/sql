@@ -262,7 +262,20 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
 	start := time.Now()
-	rows, err := s.wrapped.(driver.StmtQueryContext).QueryContext(ctx, args)
+	var (
+		rows driver.Rows
+		err  error
+	)
+	sqc, ok := s.wrapped.(driver.StmtQueryContext)
+	if ok {
+		rows, err = sqc.QueryContext(ctx, args)
+	} else {
+		values := make([]driver.Value, 0, len(args))
+		for i := range args {
+			values = append(values, args[i].Value)
+		}
+		rows, err = s.wrapped.Query(values)
+	}
 	if s.queryHook != nil {
 		s.queryHook(ctx, QueryInfo{
 			Query:    s.query,
