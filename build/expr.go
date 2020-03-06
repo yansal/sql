@@ -18,11 +18,6 @@ func (bind *bind) build(b *builder) {
 	b.bind(bind.value)
 }
 
-// Infix starts a new infix expression.
-func Infix(left Expression) *InfixExpr {
-	return &InfixExpr{left: left}
-}
-
 // An InfixExpr is an infix expression.
 type InfixExpr struct {
 	left  Expression
@@ -84,8 +79,8 @@ func (i *InfixExpr) IsNull() *InfixExpr {
 	return &InfixExpr{left: &InfixExpr{left: i.left, op: "IS NULL"}}
 }
 
-func CallExpr(function string, args ...Expression) Expression {
-	return &callExpr{function: function, args: args}
+func CallExpr(function string, args ...Expression) *InfixExpr {
+	return &InfixExpr{left: &callExpr{function: function, args: args}}
 }
 
 type callExpr struct {
@@ -105,7 +100,7 @@ func (e callExpr) build(b *builder) {
 	b.write(")")
 }
 
-func Ident(s string) Expression { return identifier(s) }
+func Ident(s string) *InfixExpr { return &InfixExpr{left: identifier(s)} }
 
 type identifier string
 

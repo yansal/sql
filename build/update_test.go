@@ -21,7 +21,7 @@ func TestUpdate(t *testing.T) {
 				Value("foo", Bind("hello")),
 				Value("bar", Bind(1)),
 			).
-			Where(Infix(Ident("foo")).Equal(Bind(0))),
+			Where(Ident("foo").Equal(Bind(0))),
 		out:  `UPDATE "table" SET "foo" = $1, "bar" = $2 WHERE "foo" = $3`,
 		args: []interface{}{"hello", 1, 0},
 	}, {

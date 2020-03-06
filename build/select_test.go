@@ -14,17 +14,17 @@ func TestSelect(t *testing.T) {
 	}{{
 		cmd: Select(Columns("foo")...).
 			From(Ident("table")).
-			Where(Infix(Ident("created_at")).LessThan(Bind(now))),
+			Where(Ident("created_at").LessThan(Bind(now))),
 		out:  `SELECT "foo" FROM "table" WHERE "created_at" < $1`,
 		args: []interface{}{now},
 	}, {
 		cmd: Select(Columns("foo", "bar")...).From(Ident("table")).
-			Where(Infix(Ident("foo")).In(Bind([]string{"hello", "world"}))),
+			Where(Ident("foo").In(Bind([]string{"hello", "world"}))),
 		out:  `SELECT "foo", "bar" FROM "table" WHERE "foo" IN ($1, $2)`,
 		args: []interface{}{"hello", "world"},
 	}, {
 		cmd: Select(Columns("foo")...).From(Ident("bar")).
-			Where(Infix(Ident("foo")).IsNull()),
+			Where(Ident("foo").IsNull()),
 		out: `SELECT "foo" FROM "bar" WHERE "foo" IS NULL`,
 	}, {
 		cmd:  Select(CallExpr("foo", Bind("hello"), Int(123))),
@@ -45,7 +45,7 @@ func TestSelect(t *testing.T) {
 			From(Join(
 				Ident("t1"),
 				Ident("t2"),
-				Infix(Ident("t1.user_id")).Equal(Ident("t2.id")),
+				Ident("t1.user_id").Equal(Ident("t2.id")),
 			)),
 		out: `SELECT "t1.foo", "t2.bar" FROM "t1" JOIN "t2" ON "t1.user_id" = "t2.id"`,
 	}, {
@@ -53,7 +53,7 @@ func TestSelect(t *testing.T) {
 			From(Join(
 				Ident("t1"),
 				Ident("t2"),
-				Infix(CallExpr("date_trunc", String("month"), Ident("t1.foo"))).Equal(Ident("t2.bar")),
+				CallExpr("date_trunc", String("month"), Ident("t1.foo")).Equal(Ident("t2.bar")),
 			)),
 		out: `SELECT "t1.foo", "t2.bar" FROM "t1" JOIN "t2" ON date_trunc('month', "t1.foo") = "t2.bar"`,
 	}, {
@@ -65,7 +65,7 @@ func TestSelect(t *testing.T) {
 			ColumnExpr(Ident("foo")).As("bar"),
 			ColumnExpr(CallExpr("now")).As("now"),
 			ColumnExpr(CallExpr("to_char", Ident("month"), String("YYYY-MM"))).As("month"),
-			ColumnExpr(Infix(CallExpr("sum", Ident("amount"))).Op("/", Int(100))).As("sum_amount"),
+			ColumnExpr(CallExpr("sum", Ident("amount")).Op("/", Int(100))).As("sum_amount"),
 		),
 		out: `SELECT "foo" AS "bar", now() AS "now", to_char("month", 'YYYY-MM') AS "month", sum("amount") / 100 AS "sum_amount"`,
 	}, {
@@ -81,7 +81,9 @@ func TestSelect(t *testing.T) {
 		cmd: Select(Columns("foo")...).From(Ident("bar")).OrderBy(Ident("foo")),
 		out: `SELECT "foo" FROM "bar" ORDER BY "foo"`,
 	}, {
-		cmd:  Select(Columns("foo")...).From(Ident("bar")).OrderBy(OrderExpr(Infix(Ident("foo")).Equal(Bind("hello")), Desc)),
+		cmd: Select(Columns("foo")...).
+			From(Ident("bar")).
+			OrderBy(OrderExpr(Ident("foo").Equal(Bind("hello")), Desc)),
 		out:  `SELECT "foo" FROM "bar" ORDER BY "foo" = $1 DESC`,
 		args: []interface{}{"hello"},
 	}} {
