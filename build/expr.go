@@ -113,6 +113,14 @@ func (i identifier) build(b *builder) {
 	b.write(strconv.Quote(string(i))) // TODO: quote only if the identifier must be quoted?
 }
 
+func Bool(b bool) Expression { return boolExpr(b) }
+
+type boolExpr bool
+
+func (be boolExpr) build(b *builder) {
+	b.write(strconv.FormatBool(bool(be)))
+}
+
 func Int(i int) Expression { return intExpr(i) }
 
 type intExpr int
