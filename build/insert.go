@@ -27,22 +27,25 @@ func (cmd *InsertCmd) Build() (string, []interface{}) {
 func (cmd *InsertCmd) build(b *builder) {
 	b.write("INSERT INTO ")
 	cmd.table.build(b)
-	b.write(" (")
-	for i := range cmd.values {
-		if i > 0 {
-			b.write(", ")
+	if len(cmd.values) == 0 {
+		b.write(" DEFAULT VALUES")
+	} else {
+		b.write(" (")
+		for i := range cmd.values {
+			if i > 0 {
+				b.write(", ")
+			}
+			cmd.values[i].column.build(b)
 		}
-		cmd.values[i].column.build(b)
-	}
-	b.write(") VALUES (")
-	for i := range cmd.values {
-		if i > 0 {
-			b.write(", ")
+		b.write(") VALUES (")
+		for i := range cmd.values {
+			if i > 0 {
+				b.write(", ")
+			}
+			cmd.values[i].value.build(b)
 		}
-		cmd.values[i].value.build(b)
+		b.write(")")
 	}
-	b.write(")")
-
 	if cmd.returning != nil {
 		b.write(" RETURNING ")
 		cmd.returning.build(b)

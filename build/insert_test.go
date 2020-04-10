@@ -16,6 +16,9 @@ func TestInsert(t *testing.T) {
 		out:  `INSERT INTO "table" ("foo", "bar") VALUES ($1, $2)`,
 		args: []interface{}{"hello", 1},
 	}, {
+		cmd: InsertInto("table"),
+		out: `INSERT INTO "table" DEFAULT VALUES`,
+	}, {
 		cmd: InsertInto("table").
 			Values(
 				Value("foo", Bind("hello")),
