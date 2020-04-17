@@ -14,9 +14,18 @@ type builder struct {
 
 func (b *builder) bind(value interface{}) {
 	switch v := value.(type) {
-	case int, int64, string, time.Time, driver.Valuer:
+	case bool, int, int64, string, []byte, time.Time, driver.Valuer:
 		b.params = append(b.params, value)
 		fmt.Fprintf(&b.buf, "$%d", len(b.params))
+	case []int64:
+		b.write("(")
+		for i := range v {
+			if i > 0 {
+				b.write(", ")
+			}
+			b.bind(v[i])
+		}
+		b.write(")")
 	case []string:
 		b.write("(")
 		for i := range v {
