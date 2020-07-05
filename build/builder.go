@@ -35,6 +35,15 @@ func (b *builder) bind(value interface{}) {
 			b.bind(v[i])
 		}
 		b.write(")")
+	case []interface{}:
+		b.write("(")
+		for i := range v {
+			if i > 0 {
+				b.write(", ")
+			}
+			b.bind(v[i])
+		}
+		b.write(")")
 	default:
 		panic(fmt.Sprintf("don't know how to bind value %#v (%T)", v, v))
 	}
