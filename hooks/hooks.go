@@ -26,6 +26,7 @@ type Connector struct {
 // ExecInfo is the argument of ExecHook and contains information about the executed query.
 type ExecInfo struct {
 	Query    string
+	Args     []driver.Value
 	Duration time.Duration
 	Err      error
 }
@@ -33,6 +34,7 @@ type ExecInfo struct {
 // QueryInfo is the argument of QueryHook and contains information about the executed query.
 type QueryInfo struct {
 	Query    string
+	Args     []driver.Value
 	Duration time.Duration
 	Err      error
 }
@@ -135,6 +137,7 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 	if c.execHook != nil {
 		c.execHook(context.Background(), ExecInfo{
 			Query:    query,
+			Args:     args,
 			Duration: time.Since(start),
 			Err:      err,
 		})
@@ -146,8 +149,13 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	start := time.Now()
 	res, err := c.wrapped.(driver.ExecerContext).ExecContext(ctx, query, args)
 	if c.execHook != nil {
+		values := make([]driver.Value, 0, len(args))
+		for i := range args {
+			values = append(values, args[i].Value)
+		}
 		c.execHook(ctx, ExecInfo{
 			Query:    query,
+			Args:     values,
 			Duration: time.Since(start),
 			Err:      err,
 		})
@@ -161,6 +169,7 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 	if c.queryHook != nil {
 		c.queryHook(context.Background(), QueryInfo{
 			Query:    query,
+			Args:     args,
 			Duration: time.Since(start),
 			Err:      err,
 		})
@@ -172,8 +181,13 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	start := time.Now()
 	rows, err := c.wrapped.(driver.QueryerContext).QueryContext(ctx, query, args)
 	if c.queryHook != nil {
+		values := make([]driver.Value, 0, len(args))
+		for i := range args {
+			values = append(values, args[i].Value)
+		}
 		c.queryHook(ctx, QueryInfo{
 			Query:    query,
+			Args:     values,
 			Duration: time.Since(start),
 			Err:      err,
 		})
@@ -219,6 +233,7 @@ func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
 	if s.execHook != nil {
 		s.execHook(context.Background(), ExecInfo{
 			Query:    s.query,
+			Args:     args,
 			Duration: time.Since(start),
 			Err:      err,
 		})
@@ -232,6 +247,7 @@ func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if s.queryHook != nil {
 		s.queryHook(context.Background(), QueryInfo{
 			Query:    s.query,
+			Args:     args,
 			Duration: time.Since(start),
 			Err:      err,
 		})
@@ -251,8 +267,13 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	start := time.Now()
 	res, err := s.wrapped.(driver.StmtExecContext).ExecContext(ctx, args)
 	if s.execHook != nil {
+		values := make([]driver.Value, 0, len(args))
+		for i := range args {
+			values = append(values, args[i].Value)
+		}
 		s.execHook(ctx, ExecInfo{
 			Query:    s.query,
+			Args:     values,
 			Duration: time.Since(start),
 			Err:      err,
 		})
@@ -266,19 +287,21 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 		rows driver.Rows
 		err  error
 	)
+
+	values := make([]driver.Value, 0, len(args))
+	for i := range args {
+		values = append(values, args[i].Value)
+	}
 	sqc, ok := s.wrapped.(driver.StmtQueryContext)
 	if ok {
 		rows, err = sqc.QueryContext(ctx, args)
 	} else {
-		values := make([]driver.Value, 0, len(args))
-		for i := range args {
-			values = append(values, args[i].Value)
-		}
 		rows, err = s.wrapped.Query(values)
 	}
 	if s.queryHook != nil {
 		s.queryHook(ctx, QueryInfo{
 			Query:    s.query,
+			Args:     values,
 			Duration: time.Since(start),
 			Err:      err,
 		})
