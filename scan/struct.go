@@ -36,7 +36,6 @@ func StructSlice(rows *sql.Rows, dest interface{}) error {
 		}
 	}
 
-	// TODO: set slicevalue capacity, to reduce the number of allocations.
 	for rows.Next() {
 		scannedvalue := reflect.New(structtype).Elem()
 		dests := make([]interface{}, 0, len(fieldindexes))
