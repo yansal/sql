@@ -167,3 +167,12 @@ type star struct{}
 func (star) build(b *builder) {
 	b.write("*")
 }
+
+// Raw returns a raw expression.
+func Raw(s string) *InfixExpr { return &InfixExpr{left: raw(s)} }
+
+type raw string
+
+func (r raw) build(b *builder) {
+	b.write(string(r))
+}
