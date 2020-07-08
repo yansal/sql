@@ -161,17 +161,26 @@ func FromExpr(expr Expression) AsExpr {
 	return asExpr{expr: expr}
 }
 
-// Join returns a new from item with a join clause.
+// Join returns a new from item with a JOIN clause.
 func Join(left Expression, right Expression, condition Expression) Expression {
 	return &join{left: left, right: right, condition: condition}
 }
 
+// LeftJoin returns a new from item with a LEFT JOIN clause.
+func LeftJoin(left Expression, right Expression, condition Expression) Expression {
+	return &join{jointype: "LEFT", left: left, right: right, condition: condition}
+}
+
 type join struct {
+	jointype               string
 	left, right, condition Expression
 }
 
 func (i *join) build(b *builder) {
 	i.left.build(b)
+	if i.jointype != "" {
+		b.write(" " + i.jointype)
+	}
 	b.write(" JOIN ")
 	i.right.build(b)
 	b.write(" ON ")
