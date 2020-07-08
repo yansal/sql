@@ -32,7 +32,7 @@ func StructSlice(rows *sql.Rows, dest interface{}) error {
 			}
 		}
 		if !ok {
-			return fmt.Errorf("scan: couldn't map column %s", col)
+			return fmt.Errorf("scan: couldn't map column %q", col)
 		}
 	}
 
@@ -83,7 +83,7 @@ func Struct(rows *sql.Rows, dest interface{}) error {
 			}
 		}
 		if !ok {
-			return fmt.Errorf("scan: couldn't map column %s", col)
+			return fmt.Errorf("scan: couldn't map column %q", col)
 		}
 	}
 
