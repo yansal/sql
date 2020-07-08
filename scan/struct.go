@@ -6,7 +6,8 @@ import (
 	"reflect"
 )
 
-// StructSlice scans rows to dest, which must be a pointer to a slice of structs.
+// StructSlice scans rows to dest, which must be a pointer to a slice of
+// structs.
 func StructSlice(rows *sql.Rows, dest interface{}) error {
 	slicevalue := reflect.ValueOf(dest).Elem()
 	structtype := slicevalue.Type().Elem()
@@ -50,7 +51,8 @@ func StructSlice(rows *sql.Rows, dest interface{}) error {
 	return rows.Err()
 }
 
-// Struct scans rows to dest, which must be a pointer to struct. Struct returns sql.ErrNoRows is there are no rows.
+// Struct scans rows to dest, which must be a pointer to struct. Struct returns
+// sql.ErrNoRows is there are no rows.
 func Struct(rows *sql.Rows, dest interface{}) error {
 	structvalue := reflect.ValueOf(dest).Elem()
 	structtype := structvalue.Type()
