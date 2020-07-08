@@ -41,22 +41,6 @@ func TestSelect(t *testing.T) {
 		cmd: Select(CallExpr("count", Star), Ident("foo")).From(Ident("bar")).GroupBy(Ident("foo")),
 		out: `SELECT count(*), "foo" FROM "bar" GROUP BY "foo"`,
 	}, {
-		cmd: Select(Columns("t1.foo", "t2.bar")...).
-			From(Join(
-				Ident("t1"),
-				Ident("t2"),
-				Ident("t1.user_id").Equal(Ident("t2.id")),
-			)),
-		out: `SELECT "t1.foo", "t2.bar" FROM "t1" JOIN "t2" ON "t1.user_id" = "t2.id"`,
-	}, {
-		cmd: Select(Columns("t1.foo", "t2.bar")...).
-			From(Join(
-				Ident("t1"),
-				Ident("t2"),
-				CallExpr("date_trunc", String("month"), Ident("t1.foo")).Equal(Ident("t2.bar")),
-			)),
-		out: `SELECT "t1.foo", "t2.bar" FROM "t1" JOIN "t2" ON date_trunc('month', "t1.foo") = "t2.bar"`,
-	}, {
 		cmd: Select(Columns("now")...).From(
 			FromExpr(Select(CallExpr("now"))).As("now")),
 		out: `SELECT "now" FROM (SELECT now()) AS "now"`,
