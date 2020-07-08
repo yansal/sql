@@ -81,8 +81,14 @@ func (i *InfixExpr) Op(op string, right Expression) *InfixExpr {
 	return &InfixExpr{left: &InfixExpr{left: i.left, op: op, right: right}}
 }
 
+// IsNull adds the IS NULL predicate.
 func (i *InfixExpr) IsNull() *InfixExpr {
 	return &InfixExpr{left: &InfixExpr{left: i.left, op: "IS NULL"}}
+}
+
+// IsNotNull adds the IS NOT NULL predicate.
+func (i *InfixExpr) IsNotNull() *InfixExpr {
+	return &InfixExpr{left: &InfixExpr{left: i.left, op: "IS NOT NULL"}}
 }
 
 func CallExpr(function string, args ...Expression) *InfixExpr {
