@@ -3,6 +3,7 @@ package build
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 type Expression interface{ build(*builder) }
@@ -105,12 +106,20 @@ func (e callExpr) build(b *builder) {
 	b.write(")")
 }
 
+// Ident returns an expression with the identifier s.
 func Ident(s string) *InfixExpr { return &InfixExpr{left: identifier(s)} }
 
 type identifier string
 
 func (i identifier) build(b *builder) {
-	b.write(strconv.Quote(string(i))) // TODO: quote only if the identifier must be quoted?
+	split := strings.Split(string(i), ".")
+	quoted := make([]string, 0, len(split))
+	for i := range split {
+		quoted = append(quoted,
+			strconv.Quote(split[i]), // TODO: quote only if the identifier must be quoted?
+		)
+	}
+	b.write(strings.Join(quoted, "."))
 }
 
 func Bool(b bool) Expression { return boolExpr(b) }
