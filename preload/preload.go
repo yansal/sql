@@ -69,7 +69,7 @@ func structslice(ctx context.Context, db Querier, parentvalues reflect.Value, fi
 		whereident := submatchs[2]
 		scantag := submatchs[3]
 
-		var bindvalues []interface{}
+		mapbindvalues := make(map[interface{}]struct{})
 		for i := 0; i < parentvalues.Len(); i++ {
 			bindvalue := getScanTagValue(parentvalues.Index(i), scantag)
 
@@ -80,11 +80,14 @@ func structslice(ctx context.Context, db Querier, parentvalues reflect.Value, fi
 				continue
 			}
 
-			// TODO: ensure items in bindvalues are unique?
-			bindvalues = append(bindvalues, bindvalue)
+			mapbindvalues[bindvalue] = struct{}{}
 		}
-		if bindvalues == nil {
+		if len(mapbindvalues) == 0 {
 			continue
+		}
+		bindvalues := make([]interface{}, 0, len(mapbindvalues))
+		for k := range mapbindvalues {
+			bindvalues = append(bindvalues, k)
 		}
 
 		// TODO: add callbacks: WHERE, ORDER BY, LIMIT

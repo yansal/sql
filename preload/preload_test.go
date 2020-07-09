@@ -19,8 +19,18 @@ func assertValuesEqual(t *testing.T, values, expect []driver.Value) {
 	t.Helper()
 	assertf(t, len(values) == len(expect), "expected %d values, got %d", len(expect), len(values))
 	for i := range expect {
-		assertf(t, values[i] == expect[i], "expected %v, got %v", expect[i], values[i])
+		assertContains(t, values, expect[i])
 	}
+}
+
+func assertContains(t *testing.T, slice []driver.Value, value driver.Value) {
+	t.Helper()
+	for i := range slice {
+		if slice[i] == value {
+			return
+		}
+	}
+	assertf(t, false, "expected values to contain %v, got %v", value, slice)
 }
 
 type mockConnector struct{ conn driver.Conn }
@@ -295,6 +305,42 @@ func TestSqlNotNull(t *testing.T) {
 	assertf(t, order.ShippingAddress != nil, "expected order.ShippingAddress to be not nil")
 	assertf(t, order.ShippingAddress.ID == order.ShippingAddressID.Int64,
 		"expected order.ShippingAddress to equal %d, got %d", order.ShippingAddressID.Int64, order.ShippingAddress.ID)
+}
+
+func TestUniqueBindValues(t *testing.T) {
+	ctx := context.Background()
+	var (
+		customerID int64 = 1
+	)
+	queryfunc := func(values []driver.Value) (driver.Rows, error) {
+		expect := []driver.Value{customerID}
+		assertValuesEqual(t, values, expect)
+		return &mockRows{
+			columns: []string{"id"},
+			values: [][]driver.Value{
+				{customerID},
+			},
+		}, nil
+	}
+	preparefunc := func(query string) (driver.Stmt, error) {
+		expect := `SELECT "id" FROM "customers" WHERE "id" IN ($1)`
+		assertf(t, query == expect, "expected %q, got %q", expect, query)
+		return &mockStmt{queryfunc: queryfunc}, nil
+	}
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
+
+	orders := []Order{
+		{CustomerID: customerID},
+		{CustomerID: customerID},
+	}
+	if err := StructSlice(ctx, db, orders, "Customer"); err != nil {
+		t.Fatal(err)
+	}
+	for i := range orders {
+		assertf(t, orders[i].Customer != nil, "expected orders[%d].Customer to not be nil", i)
+		assertf(t, orders[i].Customer.ID == orders[i].CustomerID,
+			"expected orders[%d].Customer.ID to equal %d, got %d", i, orders[i].CustomerID, orders[i].Customer.ID)
+	}
 }
 
 func TestNested(t *testing.T) {
