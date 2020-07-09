@@ -19,37 +19,44 @@ type Querier interface {
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 }
 
-// Struct preloads fieldnames into dest, which must be a pointer to a struct.
-func Struct(ctx context.Context, db Querier, dest interface{}, fieldnames ...string) error {
+// A Field is a field to preload.
+type Field struct {
+	Name    string
+	Where   build.Expression
+	OrderBy []build.Expression
+}
+
+// Struct preloads fields into dest, which must be a pointer to a struct.
+func Struct(ctx context.Context, db Querier, dest interface{}, fields []Field) error {
 	reflectvalue := reflect.ValueOf(dest).Elem()
 	slicevalue := reflect.New(reflect.SliceOf(reflectvalue.Type())).Elem()
 	slicevalue = reflect.Append(slicevalue, reflectvalue)
-	if err := structslice(ctx, db, slicevalue, fieldnames...); err != nil {
+	if err := structslice(ctx, db, slicevalue, fields); err != nil {
 		return err
 	}
 	reflectvalue.Set(slicevalue.Index(0))
 	return nil
 }
 
-// StructSlice preloads fieldnames into dest, which must be a struct slice.
-func StructSlice(ctx context.Context, db Querier, dest interface{}, fieldnames ...string) error {
-	return structslice(ctx, db, reflect.ValueOf(dest), fieldnames...)
+// StructSlice preloads fields into dest, which must be a slice of structs.
+func StructSlice(ctx context.Context, db Querier, dest interface{}, fields []Field) error {
+	return structslice(ctx, db, reflect.ValueOf(dest), fields)
 }
 
-func structslice(ctx context.Context, db Querier, parentvalues reflect.Value, fieldnames ...string) error {
+func structslice(ctx context.Context, db Querier, parentvalues reflect.Value, fields []Field) error {
 	if parentvalues.Len() == 0 {
 		return nil
 	}
 	parenttype := parentvalues.Index(0).Type()
 
-	for _, fieldname := range fieldnames {
-		if strings.Contains(fieldname, ".") {
+	for _, field := range fields {
+		if strings.Contains(field.Name, ".") {
 			continue
 		}
 
-		child, ok := parenttype.FieldByName(fieldname)
+		child, ok := parenttype.FieldByName(field.Name)
 		if !ok {
-			panic(fmt.Sprintf("%v does not have a field named %q", parenttype.Name(), fieldname))
+			panic(fmt.Sprintf("%v does not have a field named %q", parenttype.Name(), field.Name))
 		}
 
 		columns := listScanTags(child.Type.Elem())
@@ -90,11 +97,17 @@ func structslice(ctx context.Context, db Querier, parentvalues reflect.Value, fi
 			bindvalues = append(bindvalues, k)
 		}
 
-		// TODO: add callbacks: WHERE, ORDER BY, LIMIT
-		query, args := build.Select(build.Columns(columns...)...).
-			From(build.Ident(table)).
-			Where(build.Ident(whereident).In(build.Bind(bindvalues))).
-			Build()
+		s := build.Select(build.Columns(columns...)...).
+			From(build.Ident(table))
+		where := build.Ident(whereident).In(build.Bind(bindvalues))
+		if field.Where != nil {
+			where = where.And(field.Where)
+		}
+		s = s.Where(where)
+		if field.OrderBy != nil {
+			s = s.OrderBy(field.OrderBy...)
+		}
+		query, args := s.Build()
 
 		rows, err := db.QueryContext(ctx, query, args...)
 		if err != nil {
@@ -117,14 +130,14 @@ func structslice(ctx context.Context, db Querier, parentvalues reflect.Value, fi
 		}
 		childvalues := dest.Elem()
 
-		nested := trimprefix(fieldnames, fieldname+".")
-		if err := structslice(ctx, db, childvalues, nested...); err != nil {
+		nested := trimprefix(fields, field.Name+".")
+		if err := structslice(ctx, db, childvalues, nested); err != nil {
 			return err
 		}
 
 		for i := 0; i < parentvalues.Len(); i++ {
 			parentvalue := parentvalues.Index(i)
-			parentfield := parentvalue.FieldByName(fieldname)
+			parentfield := parentvalue.FieldByName(field.Name)
 			parentscantagvalue := getScanTagValue(parentvalue, scantag)
 			for j := 0; j < childvalues.Len(); j++ {
 				// TODO: don't recompute childvalues inside the inner loop
@@ -193,11 +206,12 @@ func valuesAreEqual(v1, v2 interface{}) (bool, error) {
 	return v1 == v2, nil
 }
 
-func trimprefix(ss []string, prefix string) []string {
-	var trimmed []string
-	for _, s := range ss {
-		if strings.HasPrefix(s, prefix) {
-			trimmed = append(trimmed, strings.TrimPrefix(s, prefix))
+func trimprefix(fields []Field, prefix string) []Field {
+	var trimmed []Field
+	for _, field := range fields {
+		if strings.HasPrefix(field.Name, prefix) {
+			field.Name = strings.TrimPrefix(field.Name, prefix)
+			trimmed = append(trimmed, field)
 		}
 	}
 	return trimmed

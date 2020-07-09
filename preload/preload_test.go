@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"testing"
+
+	"github.com/yansal/sql/build"
 )
 
 func assertf(t *testing.T, ok bool, msg string, args ...interface{}) {
@@ -118,7 +120,9 @@ func TestStructPreloadPointer(t *testing.T) {
 	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
 
 	order := Order{CustomerID: customerID}
-	if err := Struct(ctx, db, &order, "Customer"); err != nil {
+	if err := Struct(ctx, db, &order, []Field{
+		{Name: "Customer"},
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,7 +157,7 @@ func TestStructPreloadSlice(t *testing.T) {
 	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
 
 	customer := Customer{ID: customerID}
-	if err := Struct(ctx, db, &customer, "Orders"); err != nil {
+	if err := Struct(ctx, db, &customer, []Field{{Name: "Orders"}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -197,7 +201,7 @@ func TestStructSlicePreloadPointer(t *testing.T) {
 		{CustomerID: customer1ID},
 		{CustomerID: customer2ID},
 	}
-	if err := StructSlice(ctx, db, orders, "Customer"); err != nil {
+	if err := StructSlice(ctx, db, orders, []Field{{Name: "Customer"}}); err != nil {
 		t.Fatal(err)
 	}
 	for i := range orders {
@@ -239,7 +243,7 @@ func TestStructSlicePreloadSlice(t *testing.T) {
 		{ID: customer1ID},
 		{ID: customer2ID},
 	}
-	if err := StructSlice(ctx, db, customers, "Orders"); err != nil {
+	if err := StructSlice(ctx, db, customers, []Field{{Name: "Orders"}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -271,7 +275,7 @@ func TestSqlNull(t *testing.T) {
 	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
 
 	order := Order{}
-	if err := Struct(ctx, db, &order, "ShippingAddress"); err != nil {
+	if err := Struct(ctx, db, &order, []Field{{Name: "ShippingAddress"}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -298,7 +302,7 @@ func TestSqlNotNull(t *testing.T) {
 	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
 
 	order := Order{ShippingAddressID: sql.NullInt64{Int64: shippingAddressID, Valid: true}}
-	if err := Struct(ctx, db, &order, "ShippingAddress"); err != nil {
+	if err := Struct(ctx, db, &order, []Field{{Name: "ShippingAddress"}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -333,7 +337,7 @@ func TestUniqueBindValues(t *testing.T) {
 		{CustomerID: customerID},
 		{CustomerID: customerID},
 	}
-	if err := StructSlice(ctx, db, orders, "Customer"); err != nil {
+	if err := StructSlice(ctx, db, orders, []Field{{Name: "Customer"}}); err != nil {
 		t.Fatal(err)
 	}
 	for i := range orders {
@@ -341,6 +345,38 @@ func TestUniqueBindValues(t *testing.T) {
 		assertf(t, orders[i].Customer.ID == orders[i].CustomerID,
 			"expected orders[%d].Customer.ID to equal %d, got %d", i, orders[i].CustomerID, orders[i].Customer.ID)
 	}
+}
+
+func TestWhereOrderBy(t *testing.T) {
+	ctx := context.Background()
+	var customerID int64 = 1
+	queryfunc := func(values []driver.Value) (driver.Rows, error) {
+		expect := []driver.Value{customerID}
+		assertValuesEqual(t, values, expect)
+		return &mockRows{
+			columns: []string{"id"},
+			values:  [][]driver.Value{{1}},
+		}, nil
+	}
+	preparefunc := func(query string) (driver.Stmt, error) {
+		expect := `SELECT "id" FROM "customers" WHERE "id" IN ($1) AND "foo" = 'bar' ORDER BY "id"`
+		assertf(t, query == expect, "expected %q, got %q", expect, query)
+		return &mockStmt{queryfunc: queryfunc}, nil
+	}
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
+
+	order := Order{CustomerID: customerID}
+	if err := Struct(ctx, db, &order, []Field{{
+		Name:    "Customer",
+		Where:   build.Ident("foo").Equal(build.String("bar")),
+		OrderBy: []build.Expression{build.Ident("id")},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	assertf(t, order.Customer != nil, "expected order.Customer to not be nil")
+	assertf(t, order.Customer.ID == order.CustomerID,
+		"expected order.Customer.ID to equal %d, got %d", order.CustomerID, order.Customer.ID)
 }
 
 func TestNested(t *testing.T) {
@@ -391,7 +427,10 @@ func TestNested(t *testing.T) {
 	}
 	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
 	customer := Customer{ID: customerID}
-	if err := Struct(ctx, db, &customer, "Orders", "Orders.ShippingAddress"); err != nil {
+	if err := Struct(ctx, db, &customer, []Field{
+		{Name: "Orders"},
+		{Name: "Orders.ShippingAddress"},
+	}); err != nil {
 		t.Fatal(err)
 	}
 	assertf(t, len(customer.Orders) == 2,
