@@ -98,7 +98,10 @@ type Customer struct {
 }
 
 type ShippingAddress struct {
-	ID int64 `scan:"id"`
+	ID         int64 `scan:"id"`
+	CustomerID int64 `scan:"customer_id"`
+
+	Customer *Customer `preload:"customers.id = customer_id"`
 }
 
 func TestStructPreloadPointer(t *testing.T) {
@@ -295,7 +298,7 @@ func TestSqlNotNull(t *testing.T) {
 		}, nil
 	}
 	preparefunc := func(query string) (driver.Stmt, error) {
-		expect := `SELECT "id" FROM "shipping_addresses" WHERE "id" IN ($1)`
+		expect := `SELECT "id", "customer_id" FROM "shipping_addresses" WHERE "id" IN ($1)`
 		assertf(t, query == expect, "expected %q, got %q", expect, query)
 		return &mockStmt{queryfunc: queryfunc}, nil
 	}
@@ -416,7 +419,7 @@ func TestNested(t *testing.T) {
 
 	queries := []string{
 		`SELECT "id", "customer_id", "shipping_address_id" FROM "orders" WHERE "customer_id" IN ($1)`,
-		`SELECT "id" FROM "shipping_addresses" WHERE "id" IN ($1)`,
+		`SELECT "id", "customer_id" FROM "shipping_addresses" WHERE "id" IN ($1)`,
 	}
 	var p int
 	preparefunc := func(query string) (driver.Stmt, error) {
@@ -453,6 +456,82 @@ func TestNested(t *testing.T) {
 		"expected customer.Orders[1].ID to equal %d, got %d", order2ID, customer.Orders[1].ID)
 	assertf(t, customer.Orders[1].ShippingAddressID == sql.NullInt64{},
 		"expected customer.Orders[1].ShippingAddressID to not be valid")
+	assertf(t, customer.Orders[1].ShippingAddress == nil,
+		"expected customer.Orders[1].ShippingAddress to be nil")
+}
+
+func TestNestedSkipOneLevel(t *testing.T) {
+	ctx := context.Background()
+
+	var (
+		customerID        int64 = 1
+		order1ID          int64 = 2
+		order2ID          int64 = 3
+		shippingAddressID int64 = 4
+	)
+
+	queryvalues := [][]driver.Value{
+		{shippingAddressID},
+		{customerID},
+	}
+	queryrows := []driver.Rows{
+		&mockRows{
+			columns: []string{"id", "customer_id"},
+			values:  [][]driver.Value{{shippingAddressID, customerID}},
+		},
+		&mockRows{
+			columns: []string{"id"},
+			values:  [][]driver.Value{{customerID}},
+		},
+	}
+	var q int
+	queryfunc := func(values []driver.Value) (driver.Rows, error) {
+		expect := queryvalues[q]
+		assertValuesEqual(t, values, expect)
+		rows := queryrows[q]
+		q++
+		return rows, nil
+	}
+
+	queries := []string{
+		`SELECT "id", "customer_id" FROM "shipping_addresses" WHERE "id" IN ($1)`,
+		`SELECT "id" FROM "customers" WHERE "id" IN ($1)`,
+	}
+	var p int
+	preparefunc := func(query string) (driver.Stmt, error) {
+		expect := queries[p]
+		assertf(t, query == expect, "expected %q, got %q", expect, query)
+		p++
+		return &mockStmt{queryfunc: queryfunc}, nil
+	}
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
+	customer := Customer{
+		ID: customerID,
+		Orders: []Order{
+			{ID: order1ID, ShippingAddressID: sql.NullInt64{Int64: shippingAddressID, Valid: true}},
+			{ID: order2ID},
+		},
+	}
+	if err := Struct(ctx, db, &customer, []Field{
+		{Name: "Orders.ShippingAddress"},
+		{Name: "Orders.ShippingAddress.Customer"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	assertf(t, customer.Orders[0].ShippingAddress != nil,
+		"expected customer.Orders[0].ShippingAddress to not be nil")
+	assertf(t, customer.Orders[0].ShippingAddress.ID == shippingAddressID,
+		"expected customer.Orders[0].ShippingAddress.ID to equal %d, got %d",
+		shippingAddressID,
+		customer.Orders[0].ShippingAddress.ID)
+
+	assertf(t, customer.Orders[0].ShippingAddress.Customer != nil,
+		"expected customer.Orders[0].ShippingAddress.Customer to not be nil")
+	assertf(t, customer.Orders[0].ShippingAddress.Customer.ID == customerID,
+		"expected customer.Orders[0].ShippingAddress.Customer.ID to equal %d, got %d",
+		customerID,
+		customer.Orders[0].ShippingAddress.Customer.ID)
+
 	assertf(t, customer.Orders[1].ShippingAddress == nil,
 		"expected customer.Orders[1].ShippingAddress to be nil")
 }
