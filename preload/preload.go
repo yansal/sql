@@ -122,12 +122,13 @@ func preload(ctx context.Context, db Querier, parentvalues reflect.Value, field 
 
 	mapbindvalues := make(map[interface{}]struct{})
 	for i := 0; i < parentvalues.Len(); i++ {
-		bindvalue := getScanTagValue(parentvalues.Index(i), scantag)
+		bindvalue, err := getScanTagValue(parentvalues.Index(i), scantag)
+		if err != nil {
+			return err
+		}
 
 		// don't append sql NULLs
-		if isnil, err := valuesAreEqual(bindvalue, nil); err != nil {
-			return err
-		} else if isnil {
+		if bindvalue == nil {
 			continue
 		}
 
@@ -174,9 +175,24 @@ func preload(ctx context.Context, db Querier, parentvalues reflect.Value, field 
 	}
 	destvalues := dest.Elem()
 
+	// cache dest scan tag values for performance
+	destscantagvalues := make([]interface{}, 0, destvalues.Len())
+	for j := 0; j < destvalues.Len(); j++ {
+		destvalue := destvalues.Index(j)
+		scantagvalue, err := getScanTagValue(destvalue, whereident)
+		if err != nil {
+			return err
+		}
+		destscantagvalues = append(destscantagvalues, scantagvalue)
+	}
+
 	for i := 0; i < parentvalues.Len(); i++ {
 		parentvalue := parentvalues.Index(i)
-		parentscantagvalue := getScanTagValue(parentvalue, scantag)
+		parentscantagvalue, err := getScanTagValue(parentvalue, scantag)
+		if err != nil {
+			return err
+		}
+
 		if parentvalue.Kind() == reflect.Ptr {
 			parentvalue = parentvalue.Elem()
 		}
@@ -184,10 +200,7 @@ func preload(ctx context.Context, db Querier, parentvalues reflect.Value, field 
 
 		for j := 0; j < destvalues.Len(); j++ {
 			destvalue := destvalues.Index(j)
-			destscantagvalue := getScanTagValue(destvalue, whereident)
-			if ok, err := valuesAreEqual(parentscantagvalue, destscantagvalue); err != nil {
-				return err
-			} else if !ok {
+			if parentscantagvalue != destscantagvalues[j] {
 				continue
 			}
 			switch kind := child.Type.Kind(); kind {
@@ -216,35 +229,19 @@ func listScanTags(structtype reflect.Type) []string {
 
 var tagRegexp = regexp.MustCompile(`\A([\w_]+).([\w_]+)\s=\s([\w_]+)\z`)
 
-func getScanTagValue(structvalue reflect.Value, scantag string) interface{} {
+func getScanTagValue(structvalue reflect.Value, scantag string) (interface{}, error) {
 	if structvalue.Kind() == reflect.Ptr {
 		structvalue = structvalue.Elem()
 	}
 	structtype := structvalue.Type()
 	for i := 0; i < structtype.NumField(); i++ {
 		if value, ok := structtype.Field(i).Tag.Lookup("scan"); ok && scantag == value {
-			return structvalue.Field(i).Interface()
+			value := structvalue.Field(i).Interface()
+			if valuer, ok := value.(driver.Valuer); ok {
+				return valuer.Value()
+			}
+			return value, nil
 		}
 	}
 	panic(fmt.Sprintf(`%v does not have a field with the scan:%q struct tag`, structtype, scantag))
-}
-
-func valuesAreEqual(v1, v2 interface{}) (bool, error) {
-	if dv, ok := v1.(driver.Valuer); ok {
-		var err error
-		v1, err = dv.Value()
-		if err != nil {
-			return false, err
-		}
-	}
-
-	if dv, ok := v2.(driver.Valuer); ok {
-		var err error
-		v2, err = dv.Value()
-		if err != nil {
-			return false, err
-		}
-	}
-
-	return v1 == v2, nil
 }
