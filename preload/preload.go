@@ -173,17 +173,19 @@ func preload(ctx context.Context, db Querier, parentvalues reflect.Value, field 
 	if err := scan.StructSlice(rows, dest.Interface()); err != nil {
 		return err
 	}
-	destvalues := dest.Elem()
+	destreflectvalues := dest.Elem()
 
-	// cache dest scan tag values for performance
-	destscantagvalues := make([]interface{}, 0, destvalues.Len())
-	for j := 0; j < destvalues.Len(); j++ {
-		destvalue := destvalues.Index(j)
-		scantagvalue, err := getScanTagValue(destvalue, whereident)
+	// cache dest values and dest scan tag values for performance
+	lendest := destreflectvalues.Len()
+	destvalues := make([]reflect.Value, lendest)
+	destscantagvalues := make([]interface{}, lendest)
+	for i := 0; i < lendest; i++ {
+		destvalues[i] = destreflectvalues.Index(i)
+		scantagvalue, err := getScanTagValue(destvalues[i], whereident)
 		if err != nil {
 			return err
 		}
-		destscantagvalues = append(destscantagvalues, scantagvalue)
+		destscantagvalues[i] = scantagvalue
 	}
 
 	for i := 0; i < parentvalues.Len(); i++ {
@@ -198,16 +200,15 @@ func preload(ctx context.Context, db Querier, parentvalues reflect.Value, field 
 		}
 		childvalue := parentvalue.FieldByName(field.Name)
 
-		for j := 0; j < destvalues.Len(); j++ {
-			destvalue := destvalues.Index(j)
+		for j := range destvalues {
 			if parentscantagvalue != destscantagvalues[j] {
 				continue
 			}
 			switch kind := child.Type.Kind(); kind {
 			case reflect.Ptr:
-				childvalue.Set(destvalue.Addr())
+				childvalue.Set(destvalues[j].Addr())
 			case reflect.Slice:
-				childvalue.Set(reflect.Append(childvalue, destvalue))
+				childvalue.Set(reflect.Append(childvalue, destvalues[j]))
 			default:
 				panic(fmt.Sprintf("don't know how to assign to a value of kind %v", kind))
 			}
