@@ -142,50 +142,65 @@ func preload(ctx context.Context, db Querier, parentvalues reflect.Value, field 
 		bindvalues = append(bindvalues, k)
 	}
 
-	s := build.Select(build.Columns(columns...)...).
-		From(build.Ident(table))
-	where := build.Ident(whereident).In(build.Bind(bindvalues))
-	if field.Where != nil {
-		where = where.And(field.Where)
-	}
-	s = s.Where(where)
-	if field.OrderBy != nil {
-		s = s.OrderBy(field.OrderBy...)
-	}
-	query, args := s.Build()
+	var (
+		destvalues        []reflect.Value
+		destscantagvalues []interface{}
+	)
+	for {
+		// TODO: make sqliteLimitVariableNumber optional?
+		const sqliteLimitVariableNumber = 999
+		subslice := bindvalues
+		if len(subslice) > sqliteLimitVariableNumber {
+			subslice = bindvalues[:sqliteLimitVariableNumber]
+		}
 
-	rows, err := db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
+		s := build.Select(build.Columns(columns...)...).
+			From(build.Ident(table))
+		where := build.Ident(whereident).In(build.Bind(subslice))
+		if field.Where != nil {
+			where = where.And(field.Where)
+		}
+		s = s.Where(where)
+		if field.OrderBy != nil {
+			s = s.OrderBy(field.OrderBy...)
+		}
+		query, args := s.Build()
 
-	var dest reflect.Value
-	switch kind := child.Type.Kind(); kind {
-	case reflect.Ptr:
-		dest = reflect.New(reflect.SliceOf(child.Type.Elem()))
-	case reflect.Slice:
-		dest = reflect.New(child.Type)
-	default:
-		panic(fmt.Sprintf("don't know how to scan rows into a value of kind %v", kind))
-	}
-
-	if err := scan.StructSlice(rows, dest.Interface()); err != nil {
-		return err
-	}
-	destreflectvalues := dest.Elem()
-
-	// cache dest values and dest scan tag values for performance
-	lendest := destreflectvalues.Len()
-	destvalues := make([]reflect.Value, lendest)
-	destscantagvalues := make([]interface{}, lendest)
-	for i := 0; i < lendest; i++ {
-		destvalues[i] = destreflectvalues.Index(i)
-		scantagvalue, err := getScanTagValue(destvalues[i], whereident)
+		rows, err := db.QueryContext(ctx, query, args...)
 		if err != nil {
 			return err
 		}
-		destscantagvalues[i] = scantagvalue
+		defer rows.Close()
+
+		var dest reflect.Value
+		switch kind := child.Type.Kind(); kind {
+		case reflect.Ptr:
+			dest = reflect.New(reflect.SliceOf(child.Type.Elem()))
+		case reflect.Slice:
+			dest = reflect.New(child.Type)
+		default:
+			panic(fmt.Sprintf("don't know how to scan rows into a value of kind %v", kind))
+		}
+
+		if err := scan.StructSlice(rows, dest.Interface()); err != nil {
+			return err
+		}
+		destslice := dest.Elem()
+
+		for i := 0; i < destslice.Len(); i++ {
+			destvalue := destslice.Index(i)
+			destvalues = append(destvalues, destvalue)
+			scantagvalue, err := getScanTagValue(destvalue, whereident)
+			if err != nil {
+				return err
+			}
+			destscantagvalues = append(destscantagvalues, scantagvalue)
+		}
+
+		if len(bindvalues) <= sqliteLimitVariableNumber {
+			break
+		}
+		bindvalues = bindvalues[sqliteLimitVariableNumber:]
 	}
 
 	for i := 0; i < parentvalues.Len(); i++ {
