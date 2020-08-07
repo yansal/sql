@@ -1,5 +1,7 @@
 package build
 
+import "fmt"
+
 // Select returns a new SELECT command.
 func Select(exprs ...Expression) *SelectCmd {
 	return &SelectCmd{exprs: exprs}
@@ -206,23 +208,68 @@ func (l offset) build(b *builder) {
 	l.Expression.build(b)
 }
 
-func OrderExpr(expr Expression, ordering string) Expression {
-	return &orderExpr{expr: expr, ordering: ordering}
+// Order returns a new OrderExpr.
+func Order(expr Expression, direction Direction) OrderExpr {
+	return &orderExpr{expr: expr, direction: &direction}
+}
+
+// An OrderExpr is a ORDER BY expression.
+type OrderExpr interface {
+	Expression
+	Nulls(Nulls) Expression
 }
 
 type orderExpr struct {
-	expr     Expression
-	ordering string
+	expr      Expression
+	direction *Direction
+	nulls     *Nulls
+}
+
+func (o orderExpr) Nulls(nulls Nulls) Expression {
+	o.nulls = &nulls
+	return o
 }
 
 func (o orderExpr) build(b *builder) {
 	o.expr.build(b)
-	if o.ordering != "" {
-		b.write(" " + o.ordering)
+
+	if o.direction != nil {
+		switch d := *o.direction; d {
+		case Asc:
+			b.write(" ASC")
+		case Desc:
+			b.write(" DESC")
+		default:
+			panic(fmt.Sprintf("unknown direction %d", d))
+		}
+	}
+
+	if o.nulls != nil {
+		switch n := *o.nulls; n {
+		case First:
+			b.write(" NULLS FIRST")
+		case Last:
+			b.write(" NULLS LAST")
+		default:
+			panic(fmt.Sprintf("unknown nulls %d", n))
+		}
 	}
 }
 
+// A Direction is an ORDER BY direction.
+type Direction int
+
+// Direction values.
 const (
-	Asc  = "ASC"
-	Desc = "DESC"
+	Asc Direction = iota
+	Desc
+)
+
+// A Nulls is a NULLS option in an ORDER BY clause.
+type Nulls int
+
+// Nulls values.
+const (
+	First Nulls = iota
+	Last
 )

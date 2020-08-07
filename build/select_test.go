@@ -57,7 +57,7 @@ func TestSelect(t *testing.T) {
 			Ident("bar"),
 			FromExpr(CallExpr("websearch_to_tsquery", Bind("hello"))).As("tsquery"),
 		).OrderBy(
-			OrderExpr(CallExpr("ts_rank", Ident("tsv"), Ident("tsquery")), Desc),
+			Order(CallExpr("ts_rank", Ident("tsv"), Ident("tsquery")), Desc),
 		),
 		out:  `SELECT "foo" FROM "bar", websearch_to_tsquery($1) AS "tsquery" ORDER BY ts_rank("tsv", "tsquery") DESC`,
 		args: []interface{}{"hello"},
@@ -67,8 +67,14 @@ func TestSelect(t *testing.T) {
 	}, {
 		cmd: Select(Columns("foo")...).
 			From(Ident("bar")).
-			OrderBy(OrderExpr(Ident("foo").Equal(Bind("hello")), Desc)),
+			OrderBy(Order(Ident("foo").Equal(Bind("hello")), Desc)),
 		out:  `SELECT "foo" FROM "bar" ORDER BY "foo" = $1 DESC`,
+		args: []interface{}{"hello"},
+	}, {
+		cmd: Select(Columns("foo")...).
+			From(Ident("bar")).
+			OrderBy(Order(Ident("foo").Equal(Bind("hello")), Desc).Nulls(Last)),
+		out:  `SELECT "foo" FROM "bar" ORDER BY "foo" = $1 DESC NULLS LAST`,
 		args: []interface{}{"hello"},
 	}} {
 		t.Run(tt.out, func(t *testing.T) {
