@@ -3,14 +3,62 @@ package build
 import "fmt"
 
 // InsertInto builds a new INSERT command.
-func InsertInto(table string) *InsertCmd {
-	return &InsertCmd{table: Ident(table)}
+func InsertInto(table string, columns ...string) *InsertCmd {
+	cmd := &InsertCmd{table: Ident(table)}
+	if len(columns) > 0 {
+		cmd.columns = make([]Expression, len(columns))
+		for i := range columns {
+			cmd.columns[i] = Ident(columns[i])
+		}
+	}
+	return cmd
 }
 
-// Values adds a VALUES clause.
-func (cmd *InsertCmd) Values(values ...ColumnValue) *InsertCmd {
-	cmd.values = values
+// DefaultValues adds the DEFAULT VALUES keyword.
+func (cmd *InsertCmd) DefaultValues() *InsertCmd {
+	cmd.values = defaultvalues{}
 	return cmd
+}
+
+// Values adds VALUES.
+func (cmd *InsertCmd) Values(values ...Expression) *InsertCmd {
+	cmd.values = valuesexpr{values: values}
+	return cmd
+}
+
+// Query adds a query.
+func (cmd *InsertCmd) Query(query Expression) *InsertCmd {
+	cmd.values = queryexpr{query: query}
+	return cmd
+}
+
+type defaultvalues struct{}
+
+func (defaultvalues) build(b *builder) {
+	b.write("DEFAULT VALUES")
+}
+
+type valuesexpr struct {
+	values []Expression
+}
+
+func (e valuesexpr) build(b *builder) {
+	b.write("VALUES (")
+	for i := range e.values {
+		if i > 0 {
+			b.write(", ")
+		}
+		e.values[i].build(b)
+	}
+	b.write(")")
+}
+
+type queryexpr struct {
+	query Expression
+}
+
+func (e queryexpr) build(b *builder) {
+	e.query.build(b)
 }
 
 // OnConflict adds a ON CONFLICT clause.
@@ -23,73 +71,6 @@ func (cmd *InsertCmd) OnConflict(action ConflictAction) *InsertCmd {
 func (cmd *InsertCmd) OnConflictTarget(target string, action ConflictAction) *InsertCmd {
 	cmd.onconflict = &onconflictexpr{target: Ident(target), action: action}
 	return cmd
-}
-
-// Returning adds a RETURNING clause.
-func (cmd *InsertCmd) Returning(exprs ...Expression) *InsertCmd {
-	cmd.returning = exprs
-	return cmd
-}
-
-// Build builds cmd and its parameters.
-func (cmd *InsertCmd) Build() (string, []interface{}) {
-	b := new(builder)
-	cmd.build(b)
-	return b.buf.String(), b.params
-}
-
-func (cmd *InsertCmd) build(b *builder) {
-	b.write("INSERT INTO ")
-	cmd.table.build(b)
-	if len(cmd.values) == 0 {
-		b.write(" DEFAULT VALUES")
-	} else {
-		b.write(" (")
-		for i := range cmd.values {
-			if i > 0 {
-				b.write(", ")
-			}
-			cmd.values[i].column.build(b)
-		}
-		b.write(") VALUES (")
-		for i := range cmd.values {
-			if i > 0 {
-				b.write(", ")
-			}
-			cmd.values[i].value.build(b)
-		}
-		b.write(")")
-	}
-
-	if cmd.onconflict != nil {
-		b.write(" ")
-		cmd.onconflict.build(b)
-	}
-
-	if cmd.returning != nil {
-		b.write(" RETURNING ")
-		cmd.returning.build(b)
-	}
-}
-
-// A InsertCmd is a INSERT command.
-type InsertCmd struct {
-	table      Expression
-	values     []ColumnValue
-	onconflict *onconflictexpr
-	returning  selectexprs
-}
-
-func Value(column string, value Expression) ColumnValue {
-	return ColumnValue{
-		column: Ident(column),
-		value:  value,
-	}
-}
-
-type ColumnValue struct {
-	column Expression
-	value  Expression
 }
 
 type onconflictexpr struct {
@@ -110,7 +91,7 @@ func (e onconflictexpr) build(b *builder) {
 // A ConflictAction is a conflict action.
 type ConflictAction struct {
 	do     conflictactiondo
-	values []ColumnValue
+	values []Assignment
 }
 
 func (a ConflictAction) build(b *builder) {
@@ -123,9 +104,9 @@ func (a ConflictAction) build(b *builder) {
 			if i > 0 {
 				b.write(", ")
 			}
-			a.values[i].column.build(b)
+			a.values[i].columnname.build(b)
 			b.write(" = ")
-			a.values[i].value.build(b)
+			a.values[i].expr.build(b)
 		}
 	default:
 		panic(fmt.Sprintf("unknown conflict action %d", do))
@@ -136,7 +117,7 @@ func (a ConflictAction) build(b *builder) {
 var DoNothing = ConflictAction{do: donothing}
 
 // DoUpdateSet is the DO UPDATE SET conflict_action.
-func DoUpdateSet(values ...ColumnValue) ConflictAction {
+func DoUpdateSet(values ...Assignment) ConflictAction {
 	return ConflictAction{
 		do:     doupdateset,
 		values: values,
@@ -149,3 +130,68 @@ const (
 	donothing conflictactiondo = iota
 	doupdateset
 )
+
+// Returning adds a RETURNING clause.
+func (cmd *InsertCmd) Returning(exprs ...Expression) *InsertCmd {
+	cmd.returning = exprs
+	return cmd
+}
+
+// Build builds cmd and its parameters.
+func (cmd *InsertCmd) Build() (string, []interface{}) {
+	b := new(builder)
+	cmd.build(b)
+	return b.buf.String(), b.params
+}
+
+func (cmd *InsertCmd) build(b *builder) {
+	b.write("INSERT INTO ")
+	cmd.table.build(b)
+	b.write(" ")
+
+	if cmd.columns != nil {
+		b.write("(")
+		for i := range cmd.columns {
+			if i > 0 {
+				b.write(", ")
+			}
+			cmd.columns[i].build(b)
+		}
+		b.write(") ")
+	}
+
+	cmd.values.build(b)
+
+	if cmd.onconflict != nil {
+		b.write(" ")
+		cmd.onconflict.build(b)
+	}
+
+	if cmd.returning != nil {
+		b.write(" RETURNING ")
+		cmd.returning.build(b)
+	}
+}
+
+// A InsertCmd is a INSERT command.
+type InsertCmd struct {
+	table      Expression
+	columns    []Expression
+	values     Expression
+	onconflict *onconflictexpr
+	returning  selectexprs
+}
+
+// Assign returns a new assignment.
+func Assign(columnname string, expr Expression) Assignment {
+	return Assignment{
+		columnname: Ident(columnname),
+		expr:       expr,
+	}
+}
+
+// An Assignment is an assignment.
+type Assignment struct {
+	columnname Expression
+	expr       Expression
+}
