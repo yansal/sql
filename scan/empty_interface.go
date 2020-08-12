@@ -1,9 +1,7 @@
 package scan
 
-import "database/sql"
-
 // MapSlice returns rows scanned into a []map[string]interface{} value.
-func MapSlice(rows *sql.Rows) ([]map[string]interface{}, error) {
+func MapSlice(rows Rows) ([]map[string]interface{}, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, err
@@ -26,7 +24,7 @@ func MapSlice(rows *sql.Rows) ([]map[string]interface{}, error) {
 }
 
 // SliceSlice returns rows scanned into a [][]interface{} value.
-func SliceSlice(rows *sql.Rows) ([][]interface{}, error) {
+func SliceSlice(rows Rows) ([][]interface{}, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, err
@@ -48,7 +46,7 @@ func SliceSlice(rows *sql.Rows) ([][]interface{}, error) {
 	return slices, nil
 }
 
-func scanRows(columns []string, rows *sql.Rows) ([][]interface{}, error) {
+func scanRows(columns []string, rows Rows) ([][]interface{}, error) {
 	var scannedrows [][]interface{}
 	for rows.Next() {
 		var scannedptrs []interface{}

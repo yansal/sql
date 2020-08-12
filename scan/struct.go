@@ -6,9 +6,18 @@ import (
 	"reflect"
 )
 
+// Rows is the interface from which the scan package scans values. It is
+// implemented by *sql.Rows.
+type Rows interface {
+	Columns() ([]string, error)
+	Next() bool
+	Scan(dest ...interface{}) error
+	Err() error
+}
+
 // StructSlice scans rows to dest, which must be a pointer to a slice of
 // structs.
-func StructSlice(rows *sql.Rows, dest interface{}) error {
+func StructSlice(rows Rows, dest interface{}) error {
 	slicevalue := reflect.ValueOf(dest).Elem()
 	structtype := slicevalue.Type().Elem()
 
@@ -53,7 +62,7 @@ func StructSlice(rows *sql.Rows, dest interface{}) error {
 
 // Struct scans rows to dest, which must be a pointer to struct. Struct returns
 // sql.ErrNoRows is there are no rows.
-func Struct(rows *sql.Rows, dest interface{}) error {
+func Struct(rows Rows, dest interface{}) error {
 	structvalue := reflect.ValueOf(dest).Elem()
 	structtype := structvalue.Type()
 
