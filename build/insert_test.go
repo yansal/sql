@@ -8,52 +8,50 @@ func TestInsert(t *testing.T) {
 		out  string
 		args []interface{}
 	}{{
-		cmd: InsertInto("table").
-			Values(
-				Value("foo", Bind("hello")),
-				Value("bar", Bind(1)),
-			),
-		out:  `INSERT INTO "table" ("foo", "bar") VALUES ($1, $2)`,
-		args: []interface{}{"hello", 1},
-	}, {
-		cmd: InsertInto("table"),
+		cmd: InsertInto("table").DefaultValues(),
 		out: `INSERT INTO "table" DEFAULT VALUES`,
 	}, {
 		cmd: InsertInto("table").
-			Values(
-				Value("foo", Bind("hello")),
-				Value("bar", Bind(1)),
-			).
+			Values(Bind("hello"), Bind(1)),
+		out:  `INSERT INTO "table" VALUES ($1, $2)`,
+		args: []interface{}{"hello", 1},
+	}, {
+		cmd: InsertInto("table", "foo", "bar").
+			Values(Bind("hello"), Bind(1)),
+		out:  `INSERT INTO "table" ("foo", "bar") VALUES ($1, $2)`,
+		args: []interface{}{"hello", 1},
+	}, {
+		cmd: InsertInto("table").
+			Query(Select(Ident("foo")).
+				From(Ident("bar")).
+				Where(Ident("baz").Equal(Bind(1))),
+			),
+		out:  `INSERT INTO "table" SELECT "foo" FROM "bar" WHERE "baz" = $1`,
+		args: []interface{}{1},
+	}, {
+		cmd: InsertInto("table", "foo", "bar").
+			Values(Bind("hello"), Bind(1)).
 			Returning(Columns("one", "two", "three")...),
 		out:  `INSERT INTO "table" ("foo", "bar") VALUES ($1, $2) RETURNING "one", "two", "three"`,
 		args: []interface{}{"hello", 1},
 	}, {
-		cmd: InsertInto("table").
-			Values(
-				Value("foo", Bind("hello")),
-				Value("bar", Bind(1)),
-			).
+		cmd: InsertInto("table", "foo", "bar").
+			Values(Bind("hello"), Bind(1)).
 			OnConflict(DoNothing),
 		out:  `INSERT INTO "table" ("foo", "bar") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 		args: []interface{}{"hello", 1},
 	}, {
-		cmd: InsertInto("table").
-			Values(
-				Value("foo", Bind("hello")),
-				Value("bar", Bind(1)),
-			).
+		cmd: InsertInto("table", "foo", "bar").
+			Values(Bind("hello"), Bind(1)).
 			OnConflictTarget("target", DoNothing),
 		out:  `INSERT INTO "table" ("foo", "bar") VALUES ($1, $2) ON CONFLICT ("target") DO NOTHING`,
 		args: []interface{}{"hello", 1},
 	}, {
-		cmd: InsertInto("table").
-			Values(
-				Value("foo", Bind("hello")),
-				Value("bar", Bind(1)),
-			).
+		cmd: InsertInto("table", "foo", "bar").
+			Values(Bind("hello"), Bind(1)).
 			OnConflict(DoUpdateSet(
-				Value("foo", Bind("hello")),
-				Value("bar", Bind(1)),
+				Assign("foo", Bind("hello")),
+				Assign("bar", Bind(1)),
 			)),
 		out:  `INSERT INTO "table" ("foo", "bar") VALUES ($1, $2) ON CONFLICT DO UPDATE SET "foo" = $3, "bar" = $4`,
 		args: []interface{}{"hello", 1, "hello", 1},

@@ -6,8 +6,8 @@ func Update(table string) *UpdateCmd {
 }
 
 // Set adds a SET clause.
-func (cmd *UpdateCmd) Set(values ...ColumnValue) *UpdateCmd {
-	cmd.values = values
+func (cmd *UpdateCmd) Set(assignments ...Assignment) *UpdateCmd {
+	cmd.assignments = assignments
 	return cmd
 }
 
@@ -34,13 +34,13 @@ func (cmd *UpdateCmd) build(b *builder) {
 	b.write("UPDATE ")
 	cmd.table.build(b)
 	b.write(" SET ")
-	for i := range cmd.values {
+	for i := range cmd.assignments {
 		if i > 0 {
 			b.write(", ")
 		}
-		cmd.values[i].column.build(b)
+		cmd.assignments[i].columnname.build(b)
 		b.write(" = ")
-		cmd.values[i].value.build(b)
+		cmd.assignments[i].expr.build(b)
 	}
 
 	if cmd.where != nil {
@@ -56,8 +56,8 @@ func (cmd *UpdateCmd) build(b *builder) {
 
 // A UpdateCmd is an UPDATE command.
 type UpdateCmd struct {
-	table     Expression
-	values    []ColumnValue
-	where     *where
-	returning selectexprs
+	table       Expression
+	assignments []Assignment
+	where       *where
+	returning   selectexprs
 }

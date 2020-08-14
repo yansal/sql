@@ -10,16 +10,16 @@ func TestUpdate(t *testing.T) {
 	}{{
 		cmd: Update("table").
 			Set(
-				Value("foo", Bind("hello")),
-				Value("bar", Bind(1)),
+				Assign("foo", Bind("hello")),
+				Assign("bar", Bind(1)),
 			),
 		out:  `UPDATE "table" SET "foo" = $1, "bar" = $2`,
 		args: []interface{}{"hello", 1},
 	}, {
 		cmd: Update("table").
 			Set(
-				Value("foo", Bind("hello")),
-				Value("bar", Bind(1)),
+				Assign("foo", Bind("hello")),
+				Assign("bar", Bind(1)),
 			).
 			Where(Ident("foo").Equal(Bind(0))),
 		out:  `UPDATE "table" SET "foo" = $1, "bar" = $2 WHERE "foo" = $3`,
@@ -27,8 +27,8 @@ func TestUpdate(t *testing.T) {
 	}, {
 		cmd: Update("table").
 			Set(
-				Value("foo", Bind("hello")),
-				Value("bar", Bind(1)),
+				Assign("foo", Bind("hello")),
+				Assign("bar", Bind(1)),
 			).Returning(Columns("one", "two", "three")...),
 		out:  `UPDATE "table" SET "foo" = $1, "bar" = $2 RETURNING "one", "two", "three"`,
 		args: []interface{}{"hello", 1},
