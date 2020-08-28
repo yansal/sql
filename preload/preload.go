@@ -44,6 +44,9 @@ func StructSlice(ctx context.Context, db Querier, dest interface{}, fields []Fie
 }
 
 func structslice(ctx context.Context, db Querier, parentvalues reflect.Value, fields []Field) error {
+	if parentvalues.Len() == 0 {
+		return nil
+	}
 	for _, field := range fields {
 		if err := preload(ctx, db, parentvalues, field); err != nil {
 			return err
