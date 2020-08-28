@@ -103,3 +103,43 @@ func Struct(rows Rows, dest interface{}) error {
 	}
 	return nil
 }
+
+// GetColumns returns "scan" struct tag strings in model.
+func GetColumns(model interface{}) []string {
+	reflecttype := reflect.TypeOf(model)
+	var ss []string
+	for i := 0; i < reflecttype.NumField(); i++ {
+		field := reflecttype.Field(i)
+		if value, ok := field.Tag.Lookup("scan"); ok {
+			ss = append(ss, value)
+		}
+	}
+	return ss
+}
+
+// GetValues returns field values in model where "scan" struct tag strings are
+// in columns.
+func GetValues(model interface{}, columns []string) []interface{} {
+	reflectvalue := reflect.ValueOf(model)
+	if reflectvalue.Kind() == reflect.Ptr {
+		reflectvalue = reflectvalue.Elem()
+	}
+	reflecttype := reflectvalue.Type()
+	values := make([]interface{}, len(columns))
+	for i := range columns {
+		var ok bool
+		for j := 0; j < reflecttype.NumField(); j++ {
+			tagvalue := reflecttype.Field(j).Tag.Get("scan")
+			if columns[i] != tagvalue {
+				continue
+			}
+			values[i] = reflectvalue.Field(j).Interface()
+			ok = true
+			break
+		}
+		if !ok {
+			panic(fmt.Sprintf("scan: unknown column %q", columns[i]))
+		}
+	}
+	return values
+}
