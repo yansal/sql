@@ -51,6 +51,9 @@ func (cmd *SelectCmd) Build() (string, []interface{}) {
 }
 
 func (cmd *SelectCmd) build(b *builder) {
+	if cmd.ctes != nil {
+		cmd.ctes.build(b)
+	}
 	b.write("SELECT ")
 	cmd.exprs.build(b)
 
@@ -87,6 +90,7 @@ func (cmd *SelectCmd) build(b *builder) {
 
 // A SelectCmd is a SELECT command.
 type SelectCmd struct {
+	ctes    *CTEs
 	exprs   selectexprs
 	from    from
 	where   *where
