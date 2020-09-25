@@ -2,27 +2,23 @@ package build
 
 // WindowFunction returns a new window function.
 func WindowFunction(function string, args ...Expression) WindowFunctionExpr {
-	return windowFunctionExpr{function: function, args: args}
+	return WindowFunctionExpr{function: function, args: args}
 }
 
 // A WindowFunctionExpr is a window function expression.
-type WindowFunctionExpr interface {
-	Expression
-	Over(WindowExpr) Expression
+type WindowFunctionExpr struct {
+	function string
+	args     []Expression
+	over     *WindowDefinition
 }
 
-type windowFunctionExpr struct {
-	function   string
-	args       []Expression
-	windowExpr WindowExpr
-}
-
-func (w windowFunctionExpr) Over(windowExpr WindowExpr) Expression {
-	w.windowExpr = windowExpr
+// Over sets the window defintion of w.
+func (w WindowFunctionExpr) Over(def WindowDefinition) Expression {
+	w.over = &def
 	return w
 }
 
-func (w windowFunctionExpr) build(b *builder) {
+func (w WindowFunctionExpr) build(b *builder) {
 	b.write(w.function)
 	b.write("(")
 	for i, arg := range w.args {
@@ -31,20 +27,48 @@ func (w windowFunctionExpr) build(b *builder) {
 		}
 		arg.build(b)
 	}
-	b.write(")")
-	if w.windowExpr.partitionBy != nil {
-		b.write(" OVER (PARTITION BY ")
-		w.windowExpr.partitionBy.build(b)
-		b.write(")")
+	b.write(") OVER (")
+	if w.over != nil {
+		b.write(" ")
+		w.over.build(b)
+		b.write(" ")
 	}
+	b.write(")")
 }
 
-// PartitionBy returns a new WindowExpr.
-func PartitionBy(expr Expression) WindowExpr {
-	return WindowExpr{partitionBy: expr}
+// PartitionBy returns a window definition.
+func PartitionBy(expr Expression) WindowDefinition {
+	return WindowDefinition{partitionby: expr}
 }
 
-// A WindowExpr is a window expression.
-type WindowExpr struct {
-	partitionBy Expression
+// OrderBy returns a window definition.
+func OrderBy(exprs ...Expression) WindowDefinition {
+	return WindowDefinition{orderby: exprs}
+}
+
+// A WindowDefinition is a window definition.
+type WindowDefinition struct {
+	partitionby Expression
+	orderby     orderby
+}
+
+// OrderBy adds an ORDER BY clause to d.
+func (d WindowDefinition) OrderBy(exprs ...Expression) WindowDefinition {
+	d.orderby = exprs
+	return d
+}
+
+func (d WindowDefinition) build(b *builder) {
+	if d.partitionby != nil {
+		b.write("PARTITION BY ")
+		d.partitionby.build(b)
+	}
+
+	if d.partitionby != nil && d.orderby != nil {
+		b.write(" ")
+	}
+
+	if d.orderby != nil {
+		d.orderby.build(b)
+	}
 }

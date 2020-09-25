@@ -17,7 +17,30 @@ func TestWindowFunction(t *testing.T) {
 			WindowFunction("avg", Ident("salary")).Over(PartitionBy(Ident("depname"))),
 		).
 			From(Ident("empsalary")),
-		out: `SELECT "depname", "empno", "salary", avg("salary") OVER (PARTITION BY "depname") FROM "empsalary"`,
+		out: `SELECT "depname", "empno", "salary", avg("salary") OVER ( PARTITION BY "depname" ) FROM "empsalary"`,
+	}, {
+		cmd: Select(
+			Ident("depname"),
+			Ident("empno"),
+			Ident("salary"),
+			WindowFunction("rank").Over(PartitionBy(Ident("depname")).OrderBy(Order(Ident("salary"), Desc))),
+		).
+			From(Ident("empsalary")),
+		out: `SELECT "depname", "empno", "salary", rank() OVER ( PARTITION BY "depname" ORDER BY "salary" DESC ) FROM "empsalary"`,
+	}, {
+		cmd: Select(
+			Ident("salary"),
+			WindowFunction("sum", Ident("salary")),
+		).
+			From(Ident("empsalary")),
+		out: `SELECT "salary", sum("salary") OVER () FROM "empsalary"`,
+	}, {
+		cmd: Select(
+			Ident("salary"),
+			WindowFunction("sum", Ident("salary")).Over(OrderBy(Ident("salary"))),
+		).
+			From(Ident("empsalary")),
+		out: `SELECT "salary", sum("salary") OVER ( ORDER BY "salary" ) FROM "empsalary"`,
 	}} {
 		t.Run(tt.out, func(t *testing.T) {
 			out, args := tt.cmd.Build()
