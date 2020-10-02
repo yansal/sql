@@ -1,6 +1,6 @@
 # sql
 
-* sql/build: build commands
+* sql/build: build statements
 * sql/hooks: hook into the connector, useful for instrumenting
 * sql/lb: balance connections between multiple connectors
 * sql/nest: nest transactions with savepoints
