@@ -76,6 +76,12 @@ func TestSelect(t *testing.T) {
 			OrderBy(Order(Ident("foo").Equal(Bind("hello")), Desc).Nulls(Last)),
 		out:  `SELECT "foo" FROM "bar" ORDER BY "foo" = $1 DESC NULLS LAST`,
 		args: []interface{}{"hello"},
+	}, {
+		cmd: Select(Columns("location", "time", "report")...).
+			DistinctOn(Ident("location")).
+			From(Ident("weather_reports")).
+			OrderBy(Ident("location"), Order(Ident("time"), Desc)),
+		out: `SELECT DISTINCT ON ("location") "location", "time", "report" FROM "weather_reports" ORDER BY "location", "time" DESC`,
 	}} {
 		t.Run(tt.out, func(t *testing.T) {
 			out, args := tt.cmd.Build()

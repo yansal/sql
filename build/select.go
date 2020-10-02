@@ -7,6 +7,12 @@ func Select(exprs ...Expression) *SelectCmd {
 	return &SelectCmd{exprs: exprs}
 }
 
+// DistinctOn adds a DISINCT ON clause.
+func (cmd *SelectCmd) DistinctOn(exprs ...Expression) *SelectCmd {
+	cmd.distincton = exprs
+	return cmd
+}
+
 // From adds a FROM clause.
 func (cmd *SelectCmd) From(items ...Expression) *SelectCmd {
 	cmd.from = items
@@ -54,7 +60,13 @@ func (cmd *SelectCmd) build(b *builder) {
 	if cmd.ctes != nil {
 		cmd.ctes.build(b)
 	}
+
 	b.write("SELECT ")
+
+	if cmd.distincton != nil {
+		cmd.distincton.build(b)
+	}
+
 	cmd.exprs.build(b)
 
 	if cmd.from != nil {
@@ -90,14 +102,15 @@ func (cmd *SelectCmd) build(b *builder) {
 
 // A SelectCmd is a SELECT command.
 type SelectCmd struct {
-	ctes    *CTEs
-	exprs   selectexprs
-	from    from
-	where   *where
-	groupby groupby
-	orderby orderby
-	limit   *limit
-	offset  *offset
+	ctes       *CTEs
+	distincton distincton
+	exprs      selectexprs
+	from       from
+	where      *where
+	groupby    groupby
+	orderby    orderby
+	limit      *limit
+	offset     *offset
 }
 
 type selectexprs []Expression
@@ -149,6 +162,19 @@ func Columns(names ...string) []Expression {
 		columns = append(columns, asExpr{expr: identifier(name)})
 	}
 	return columns
+}
+
+type distincton []Expression
+
+func (exprs distincton) build(b *builder) {
+	b.write("DISTINCT ON (")
+	for i := range exprs {
+		if i > 0 {
+			b.write(", ")
+		}
+		exprs[i].build(b)
+	}
+	b.write(") ")
 }
 
 type from []Expression
