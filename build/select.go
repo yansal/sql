@@ -31,6 +31,12 @@ func (cmd *SelectCmd) GroupBy(elements ...Expression) *SelectCmd {
 	return cmd
 }
 
+// Union adds a UNION clause.
+func (cmd *SelectCmd) Union(stmt Expression) *SelectCmd {
+	cmd.unions = append(cmd.unions, stmt)
+	return cmd
+}
+
 // OrderBy adds a ORDER BY clause.
 func (cmd *SelectCmd) OrderBy(exprs ...Expression) *SelectCmd {
 	cmd.orderby = exprs
@@ -84,6 +90,11 @@ func (cmd *SelectCmd) build(b *builder) {
 		cmd.groupby.build(b)
 	}
 
+	if cmd.unions != nil {
+		b.write(" ")
+		cmd.unions.build(b)
+	}
+
 	if cmd.orderby != nil {
 		b.write(" ")
 		cmd.orderby.build(b)
@@ -108,6 +119,7 @@ type SelectCmd struct {
 	from       from
 	where      *where
 	groupby    groupby
+	unions     unions
 	orderby    orderby
 	limit      *limit
 	offset     *offset
@@ -209,6 +221,18 @@ func (g groupby) build(b *builder) {
 			b.write(", ")
 		}
 		g[i].build(b)
+	}
+}
+
+type unions []Expression
+
+func (u unions) build(b *builder) {
+	for i := range u {
+		if i > 0 {
+			b.write(" ")
+		}
+		b.write("UNION ")
+		u[i].build(b)
 	}
 }
 

@@ -82,6 +82,16 @@ func TestSelect(t *testing.T) {
 			From(Ident("weather_reports")).
 			OrderBy(Ident("location"), Order(Ident("time"), Desc)),
 		out: `SELECT DISTINCT ON ("location") "location", "time", "report" FROM "weather_reports" ORDER BY "location", "time" DESC`,
+	}, {
+		cmd: Select(Ident("distributors.name")).
+			From(Ident("distributors")).
+			Where(Ident("distributors.name").Op("LIKE", String("W%"))).
+			Union(
+				Select(Ident("actors.name")).
+					From(Ident("actors")).
+					Where(Ident("actors.name").Op("LIKE", String("W%"))),
+			),
+		out: `SELECT "distributors"."name" FROM "distributors" WHERE "distributors"."name" LIKE 'W%' UNION SELECT "actors"."name" FROM "actors" WHERE "actors"."name" LIKE 'W%'`,
 	}} {
 		t.Run(tt.out, func(t *testing.T) {
 			out, args := tt.cmd.Build()
