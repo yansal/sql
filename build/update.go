@@ -1,61 +1,61 @@
 package build
 
-// Update builds a new UPDATE command.
-func Update(table string) *UpdateCmd {
-	return &UpdateCmd{table: Ident(table)}
+// Update returns a new UPDATE statement.
+func Update(table string) *UpdateStmt {
+	return &UpdateStmt{table: Ident(table)}
 }
 
 // Set adds a SET clause.
-func (cmd *UpdateCmd) Set(assignments ...Assignment) *UpdateCmd {
-	cmd.assignments = assignments
-	return cmd
+func (stmt *UpdateStmt) Set(assignments ...Assignment) *UpdateStmt {
+	stmt.assignments = assignments
+	return stmt
 }
 
 // Where adds a WHERE clause.
-func (cmd *UpdateCmd) Where(condition Expression) *UpdateCmd {
-	cmd.where = &where{Expression: condition}
-	return cmd
+func (stmt *UpdateStmt) Where(condition Expression) *UpdateStmt {
+	stmt.where = &where{Expression: condition}
+	return stmt
 }
 
 // Returning adds a RETURNING clause.
-func (cmd *UpdateCmd) Returning(exprs ...Expression) *UpdateCmd {
-	cmd.returning = exprs
-	return cmd
+func (stmt *UpdateStmt) Returning(exprs ...Expression) *UpdateStmt {
+	stmt.returning = exprs
+	return stmt
 }
 
-// Build builds cmd and its parameters.
-func (cmd *UpdateCmd) Build() (string, []interface{}) {
+// Build builds stmt and its parameters.
+func (stmt *UpdateStmt) Build() (string, []interface{}) {
 	b := new(builder)
-	cmd.build(b)
+	stmt.build(b)
 	return b.buf.String(), b.params
 }
 
-func (cmd *UpdateCmd) build(b *builder) {
+func (stmt *UpdateStmt) build(b *builder) {
 	b.write("UPDATE ")
-	cmd.table.build(b)
+	stmt.table.build(b)
 	b.write(" SET ")
-	for i := range cmd.assignments {
+	for i := range stmt.assignments {
 		if i > 0 {
 			b.write(", ")
 		}
-		cmd.assignments[i].columnname.build(b)
+		stmt.assignments[i].columnname.build(b)
 		b.write(" = ")
-		cmd.assignments[i].expr.build(b)
+		stmt.assignments[i].expr.build(b)
 	}
 
-	if cmd.where != nil {
+	if stmt.where != nil {
 		b.write(" ")
-		cmd.where.build(b)
+		stmt.where.build(b)
 	}
 
-	if cmd.returning != nil {
+	if stmt.returning != nil {
 		b.write(" RETURNING ")
-		cmd.returning.build(b)
+		stmt.returning.build(b)
 	}
 }
 
-// A UpdateCmd is an UPDATE command.
-type UpdateCmd struct {
+// A UpdateStmt is an UPDATE statement.
+type UpdateStmt struct {
 	table       Expression
 	assignments []Assignment
 	where       *where

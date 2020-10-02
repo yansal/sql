@@ -22,8 +22,8 @@ func (e *CTEs) With(alias string, stmt Expression) *CTEs {
 }
 
 // Select starts a new select statement attached to e.
-func (e *CTEs) Select(exprs ...Expression) *SelectCmd {
-	return &SelectCmd{ctes: e, exprs: exprs}
+func (e *CTEs) Select(exprs ...Expression) *SelectStmt {
+	return &SelectStmt{ctes: e, exprs: exprs}
 }
 
 func (e *CTEs) build(b *builder) {

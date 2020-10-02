@@ -2,117 +2,117 @@ package build
 
 import "fmt"
 
-// Select returns a new SELECT command.
-func Select(exprs ...Expression) *SelectCmd {
-	return &SelectCmd{exprs: exprs}
+// Select returns a new SELECT statement.
+func Select(exprs ...Expression) *SelectStmt {
+	return &SelectStmt{exprs: exprs}
 }
 
 // DistinctOn adds a DISINCT ON clause.
-func (cmd *SelectCmd) DistinctOn(exprs ...Expression) *SelectCmd {
-	cmd.distincton = exprs
-	return cmd
+func (s *SelectStmt) DistinctOn(exprs ...Expression) *SelectStmt {
+	s.distincton = exprs
+	return s
 }
 
 // From adds a FROM clause.
-func (cmd *SelectCmd) From(items ...Expression) *SelectCmd {
-	cmd.from = items
-	return cmd
+func (s *SelectStmt) From(items ...Expression) *SelectStmt {
+	s.from = items
+	return s
 }
 
 // Where adds a WHERE clause.
-func (cmd *SelectCmd) Where(condition Expression) *SelectCmd {
-	cmd.where = &where{Expression: condition}
-	return cmd
+func (s *SelectStmt) Where(condition Expression) *SelectStmt {
+	s.where = &where{Expression: condition}
+	return s
 }
 
 // GroupBy adds a GROUP BY clause.
-func (cmd *SelectCmd) GroupBy(elements ...Expression) *SelectCmd {
-	cmd.groupby = elements
-	return cmd
+func (s *SelectStmt) GroupBy(elements ...Expression) *SelectStmt {
+	s.groupby = elements
+	return s
 }
 
 // Union adds a UNION clause.
-func (cmd *SelectCmd) Union(stmt Expression) *SelectCmd {
-	cmd.unions = append(cmd.unions, stmt)
-	return cmd
+func (s *SelectStmt) Union(stmt Expression) *SelectStmt {
+	s.unions = append(s.unions, stmt)
+	return s
 }
 
 // OrderBy adds a ORDER BY clause.
-func (cmd *SelectCmd) OrderBy(exprs ...Expression) *SelectCmd {
-	cmd.orderby = exprs
-	return cmd
+func (s *SelectStmt) OrderBy(exprs ...Expression) *SelectStmt {
+	s.orderby = exprs
+	return s
 }
 
 // Limit adds a LIMIT clause.
-func (cmd *SelectCmd) Limit(count Expression) *SelectCmd {
-	cmd.limit = &limit{Expression: count}
-	return cmd
+func (s *SelectStmt) Limit(count Expression) *SelectStmt {
+	s.limit = &limit{Expression: count}
+	return s
 }
 
 // Offset adds a OFFSET clause.
-func (cmd *SelectCmd) Offset(start Expression) *SelectCmd {
-	cmd.offset = &offset{Expression: start}
-	return cmd
+func (s *SelectStmt) Offset(start Expression) *SelectStmt {
+	s.offset = &offset{Expression: start}
+	return s
 }
 
-// Build builds cmd and its parameters.
-func (cmd *SelectCmd) Build() (string, []interface{}) {
+// Build builds s and its parameters.
+func (s *SelectStmt) Build() (string, []interface{}) {
 	b := new(builder)
-	cmd.build(b)
+	s.build(b)
 	return b.buf.String(), b.params
 }
 
-func (cmd *SelectCmd) build(b *builder) {
-	if cmd.ctes != nil {
-		cmd.ctes.build(b)
+func (s *SelectStmt) build(b *builder) {
+	if s.ctes != nil {
+		s.ctes.build(b)
 	}
 
 	b.write("SELECT ")
 
-	if cmd.distincton != nil {
-		cmd.distincton.build(b)
+	if s.distincton != nil {
+		s.distincton.build(b)
 	}
 
-	cmd.exprs.build(b)
+	s.exprs.build(b)
 
-	if cmd.from != nil {
+	if s.from != nil {
 		b.write(" ")
-		cmd.from.build(b)
+		s.from.build(b)
 	}
 
-	if cmd.where != nil {
+	if s.where != nil {
 		b.write(" ")
-		cmd.where.build(b)
+		s.where.build(b)
 	}
 
-	if cmd.groupby != nil {
+	if s.groupby != nil {
 		b.write(" ")
-		cmd.groupby.build(b)
+		s.groupby.build(b)
 	}
 
-	if cmd.unions != nil {
+	if s.unions != nil {
 		b.write(" ")
-		cmd.unions.build(b)
+		s.unions.build(b)
 	}
 
-	if cmd.orderby != nil {
+	if s.orderby != nil {
 		b.write(" ")
-		cmd.orderby.build(b)
+		s.orderby.build(b)
 	}
 
-	if cmd.limit != nil {
+	if s.limit != nil {
 		b.write(" ")
-		cmd.limit.build(b)
+		s.limit.build(b)
 	}
 
-	if cmd.offset != nil {
+	if s.offset != nil {
 		b.write(" ")
-		cmd.offset.build(b)
+		s.offset.build(b)
 	}
 }
 
-// A SelectCmd is a SELECT command.
-type SelectCmd struct {
+// A SelectStmt is a SELECT statement.
+type SelectStmt struct {
 	ctes       *CTEs
 	distincton distincton
 	exprs      selectexprs
@@ -155,7 +155,7 @@ func (e asExpr) As(alias string) Expression {
 }
 
 func (e asExpr) build(b *builder) {
-	if _, ok := e.expr.(*SelectCmd); ok {
+	if _, ok := e.expr.(*SelectStmt); ok {
 		b.write("(")
 		e.expr.build(b)
 		b.write(")")

@@ -4,11 +4,11 @@ import "testing"
 
 func TestAggr(t *testing.T) {
 	for _, tt := range []struct {
-		cmd  *SelectCmd
+		stmt *SelectStmt
 		out  string
 		args []interface{}
 	}{{
-		cmd: Select(
+		stmt: Select(
 			ColumnExpr(
 				CallExpr("count", Star),
 			).As("unfiltered"),
@@ -20,7 +20,7 @@ func TestAggr(t *testing.T) {
 		out: `SELECT count(*) AS "unfiltered", count(*) FILTER (WHERE "i" < 5) AS "filtered" FROM generate_series(1, 10) AS "i"`,
 	}} {
 		t.Run(tt.out, func(t *testing.T) {
-			out, args := tt.cmd.Build()
+			out, args := tt.stmt.Build()
 			assertf(t, out == tt.out, "expected %q, got %q", tt.out, out)
 			assertf(t, len(args) == len(tt.args), "expected %d args, got %d", len(tt.args), len(args))
 			minlen := len(args)

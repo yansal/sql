@@ -4,11 +4,11 @@ import "testing"
 
 func TestJoin(t *testing.T) {
 	for _, tt := range []struct {
-		cmd  *SelectCmd
+		stmt *SelectStmt
 		out  string
 		args []interface{}
 	}{{
-		cmd: Select(Columns("t1.foo", "t2.bar")...).
+		stmt: Select(Columns("t1.foo", "t2.bar")...).
 			From(Join(
 				Ident("t1"),
 				Ident("t2"),
@@ -17,7 +17,7 @@ func TestJoin(t *testing.T) {
 			)),
 		out: `SELECT "t1"."foo", "t2"."bar" FROM "t1" JOIN "t2" ON "t1"."user_id" = "t2"."id"`,
 	}, {
-		cmd: Select(Columns("t1.foo", "t2.bar")...).
+		stmt: Select(Columns("t1.foo", "t2.bar")...).
 			From(Join(
 				Ident("t1"),
 				Ident("t2"),
@@ -27,7 +27,7 @@ func TestJoin(t *testing.T) {
 		out: `SELECT "t1"."foo", "t2"."bar" FROM "t1" JOIN "t2" ON date_trunc('month', "t1"."foo") = "t2"."bar"`,
 	}} {
 		t.Run(tt.out, func(t *testing.T) {
-			out, args := tt.cmd.Build()
+			out, args := tt.stmt.Build()
 			assertf(t, out == tt.out, "expected %q, got %q", tt.out, out)
 			assertf(t, len(args) == len(tt.args), "expected %d args, got %d", len(tt.args), len(args))
 			minlen := len(args)

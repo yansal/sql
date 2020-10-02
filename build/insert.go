@@ -2,34 +2,34 @@ package build
 
 import "fmt"
 
-// InsertInto builds a new INSERT command.
-func InsertInto(table string, columns ...string) *InsertCmd {
-	cmd := &InsertCmd{table: Ident(table)}
+// InsertInto returns a new INSERT statement.
+func InsertInto(table string, columns ...string) *InsertStmt {
+	stmt := &InsertStmt{table: Ident(table)}
 	if len(columns) > 0 {
-		cmd.columns = make([]Expression, len(columns))
+		stmt.columns = make([]Expression, len(columns))
 		for i := range columns {
-			cmd.columns[i] = Ident(columns[i])
+			stmt.columns[i] = Ident(columns[i])
 		}
 	}
-	return cmd
+	return stmt
 }
 
 // DefaultValues adds the DEFAULT VALUES keyword.
-func (cmd *InsertCmd) DefaultValues() *InsertCmd {
-	cmd.values = defaultvalues{}
-	return cmd
+func (stmt *InsertStmt) DefaultValues() *InsertStmt {
+	stmt.values = defaultvalues{}
+	return stmt
 }
 
 // Values adds VALUES.
-func (cmd *InsertCmd) Values(values ...Expression) *InsertCmd {
-	cmd.values = valuesexpr{values: values}
-	return cmd
+func (stmt *InsertStmt) Values(values ...Expression) *InsertStmt {
+	stmt.values = valuesexpr{values: values}
+	return stmt
 }
 
 // Query adds a query.
-func (cmd *InsertCmd) Query(query Expression) *InsertCmd {
-	cmd.values = queryexpr{query: query}
-	return cmd
+func (stmt *InsertStmt) Query(query Expression) *InsertStmt {
+	stmt.values = queryexpr{query: query}
+	return stmt
 }
 
 type defaultvalues struct{}
@@ -62,15 +62,15 @@ func (e queryexpr) build(b *builder) {
 }
 
 // OnConflict adds a ON CONFLICT clause.
-func (cmd *InsertCmd) OnConflict(action ConflictAction) *InsertCmd {
-	cmd.onconflict = &onconflictexpr{action: action}
-	return cmd
+func (stmt *InsertStmt) OnConflict(action ConflictAction) *InsertStmt {
+	stmt.onconflict = &onconflictexpr{action: action}
+	return stmt
 }
 
 // OnConflictTarget adds a ON CONFLICT clause with a conflict target.
-func (cmd *InsertCmd) OnConflictTarget(target string, action ConflictAction) *InsertCmd {
-	cmd.onconflict = &onconflictexpr{target: Ident(target), action: action}
-	return cmd
+func (stmt *InsertStmt) OnConflictTarget(target string, action ConflictAction) *InsertStmt {
+	stmt.onconflict = &onconflictexpr{target: Ident(target), action: action}
+	return stmt
 }
 
 type onconflictexpr struct {
@@ -132,49 +132,49 @@ const (
 )
 
 // Returning adds a RETURNING clause.
-func (cmd *InsertCmd) Returning(exprs ...Expression) *InsertCmd {
-	cmd.returning = exprs
-	return cmd
+func (stmt *InsertStmt) Returning(exprs ...Expression) *InsertStmt {
+	stmt.returning = exprs
+	return stmt
 }
 
-// Build builds cmd and its parameters.
-func (cmd *InsertCmd) Build() (string, []interface{}) {
+// Build builds stmt and its parameters.
+func (stmt *InsertStmt) Build() (string, []interface{}) {
 	b := new(builder)
-	cmd.build(b)
+	stmt.build(b)
 	return b.buf.String(), b.params
 }
 
-func (cmd *InsertCmd) build(b *builder) {
+func (stmt *InsertStmt) build(b *builder) {
 	b.write("INSERT INTO ")
-	cmd.table.build(b)
+	stmt.table.build(b)
 	b.write(" ")
 
-	if cmd.columns != nil {
+	if stmt.columns != nil {
 		b.write("(")
-		for i := range cmd.columns {
+		for i := range stmt.columns {
 			if i > 0 {
 				b.write(", ")
 			}
-			cmd.columns[i].build(b)
+			stmt.columns[i].build(b)
 		}
 		b.write(") ")
 	}
 
-	cmd.values.build(b)
+	stmt.values.build(b)
 
-	if cmd.onconflict != nil {
+	if stmt.onconflict != nil {
 		b.write(" ")
-		cmd.onconflict.build(b)
+		stmt.onconflict.build(b)
 	}
 
-	if cmd.returning != nil {
+	if stmt.returning != nil {
 		b.write(" RETURNING ")
-		cmd.returning.build(b)
+		stmt.returning.build(b)
 	}
 }
 
-// A InsertCmd is a INSERT command.
-type InsertCmd struct {
+// A InsertStmt is a INSERT statement.
+type InsertStmt struct {
 	table      Expression
 	columns    []Expression
 	values     Expression

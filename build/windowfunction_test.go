@@ -6,11 +6,11 @@ import (
 
 func TestWindowFunction(t *testing.T) {
 	for _, tt := range []struct {
-		cmd  *SelectCmd
+		stmt *SelectStmt
 		out  string
 		args []interface{}
 	}{{
-		cmd: Select(
+		stmt: Select(
 			Ident("depname"),
 			Ident("empno"),
 			Ident("salary"),
@@ -19,7 +19,7 @@ func TestWindowFunction(t *testing.T) {
 			From(Ident("empsalary")),
 		out: `SELECT "depname", "empno", "salary", avg("salary") OVER ( PARTITION BY "depname" ) FROM "empsalary"`,
 	}, {
-		cmd: Select(
+		stmt: Select(
 			Ident("depname"),
 			Ident("empno"),
 			Ident("salary"),
@@ -28,14 +28,14 @@ func TestWindowFunction(t *testing.T) {
 			From(Ident("empsalary")),
 		out: `SELECT "depname", "empno", "salary", rank() OVER ( PARTITION BY "depname" ORDER BY "salary" DESC ) FROM "empsalary"`,
 	}, {
-		cmd: Select(
+		stmt: Select(
 			Ident("salary"),
 			WindowFunction("sum", Ident("salary")),
 		).
 			From(Ident("empsalary")),
 		out: `SELECT "salary", sum("salary") OVER () FROM "empsalary"`,
 	}, {
-		cmd: Select(
+		stmt: Select(
 			Ident("salary"),
 			WindowFunction("sum", Ident("salary")).Over(OrderBy(Ident("salary"))),
 		).
@@ -43,7 +43,7 @@ func TestWindowFunction(t *testing.T) {
 		out: `SELECT "salary", sum("salary") OVER ( ORDER BY "salary" ) FROM "empsalary"`,
 	}} {
 		t.Run(tt.out, func(t *testing.T) {
-			out, args := tt.cmd.Build()
+			out, args := tt.stmt.Build()
 			assertf(t, out == tt.out, "expected %q, got %q", tt.out, out)
 			assertf(t, len(args) == len(tt.args), "expected %d args, got %d", len(tt.args), len(args))
 			minlen := len(args)

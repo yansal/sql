@@ -4,11 +4,11 @@ import "testing"
 
 func TestCase(t *testing.T) {
 	for _, tt := range []struct {
-		cmd  *SelectCmd
+		stmt *SelectStmt
 		out  string
 		args []interface{}
 	}{{
-		cmd: Select(
+		stmt: Select(
 			Ident("a"),
 			CaseWhen(Ident("a").Equal(Int(1)), String("one")).When(Ident("a").Equal(Int(2)), String("two")).Else(String("other")),
 		).
@@ -16,7 +16,7 @@ func TestCase(t *testing.T) {
 		out: `SELECT "a", CASE WHEN "a" = 1 THEN 'one' WHEN "a" = 2 THEN 'two' ELSE 'other' END FROM "test"`,
 	}} {
 		t.Run(tt.out, func(t *testing.T) {
-			out, args := tt.cmd.Build()
+			out, args := tt.stmt.Build()
 			assertf(t, out == tt.out, "expected %q, got %q", tt.out, out)
 			assertf(t, len(args) == len(tt.args), "expected %d args, got %d", len(tt.args), len(args))
 			minlen := len(args)
