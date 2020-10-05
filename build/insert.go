@@ -68,9 +68,32 @@ func (stmt *InsertStmt) OnConflict(action ConflictAction) *InsertStmt {
 }
 
 // OnConflictTarget adds a ON CONFLICT clause with a conflict target.
-func (stmt *InsertStmt) OnConflictTarget(target string, action ConflictAction) *InsertStmt {
-	stmt.onconflict = &onconflictexpr{target: Ident(target), action: action}
+func (stmt *InsertStmt) OnConflictTarget(target Expression, action ConflictAction) *InsertStmt {
+	stmt.onconflict = &onconflictexpr{target: target, action: action}
 	return stmt
+}
+
+// ConflictTarget returns a new ConflictTargetExpr.
+func ConflictTarget(columns ...string) ConflictTargetExpr {
+	exprs := make([]Expression, 0, len(columns))
+	for i := range columns {
+		exprs = append(exprs, Ident(columns[i]))
+	}
+	return ConflictTargetExpr{exprs: exprs}
+}
+
+// A ConflictTargetExpr is a conflict target expression.
+type ConflictTargetExpr struct {
+	exprs []Expression
+}
+
+func (e ConflictTargetExpr) build(b *builder) {
+	for i := range e.exprs {
+		if i != 0 {
+			b.write(", ")
+		}
+		e.exprs[i].build(b)
+	}
 }
 
 type onconflictexpr struct {

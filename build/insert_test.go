@@ -43,8 +43,14 @@ func TestInsert(t *testing.T) {
 	}, {
 		stmt: InsertInto("table", "foo", "bar").
 			Values(Bind("hello"), Bind(1)).
-			OnConflictTarget("target", DoNothing),
+			OnConflictTarget(Ident("target"), DoNothing),
 		out:  `INSERT INTO "table" ("foo", "bar") VALUES ($1, $2) ON CONFLICT ("target") DO NOTHING`,
+		args: []interface{}{"hello", 1},
+	}, {
+		stmt: InsertInto("table", "foo", "bar").
+			Values(Bind("hello"), Bind(1)).
+			OnConflictTarget(ConflictTarget("target1", "target2"), DoNothing),
+		out:  `INSERT INTO "table" ("foo", "bar") VALUES ($1, $2) ON CONFLICT ("target1", "target2") DO NOTHING`,
 		args: []interface{}{"hello", 1},
 	}, {
 		stmt: InsertInto("table", "foo", "bar").
