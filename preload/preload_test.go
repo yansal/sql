@@ -17,6 +17,7 @@ func assertf(t *testing.T, ok bool, msg string, args ...interface{}) {
 		t.Errorf(msg, args...)
 	}
 }
+
 func assertValuesEqual(t *testing.T, values, expect []driver.Value) {
 	t.Helper()
 	assertf(t, len(values) == len(expect), "expected %d values, got %d", len(expect), len(values))
@@ -316,9 +317,7 @@ func TestSqlNotNull(t *testing.T) {
 
 func TestUniqueBindValues(t *testing.T) {
 	ctx := context.Background()
-	var (
-		customerID int64 = 1
-	)
+	var customerID int64 = 1
 	queryfunc := func(values []driver.Value) (driver.Rows, error) {
 		expect := []driver.Value{customerID}
 		assertValuesEqual(t, values, expect)
