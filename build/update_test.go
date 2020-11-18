@@ -32,6 +32,13 @@ func TestUpdate(t *testing.T) {
 			).Returning(Columns("one", "two", "three")...),
 		out:  `UPDATE "table" SET "foo" = $1, "bar" = $2 RETURNING "one", "two", "three"`,
 		args: []interface{}{"hello", 1},
+	}, {
+		stmt: Update("employees").
+			Set(Assign("sales_count", Ident("sales_count").Op("+", Int(1)))).
+			From(Ident("accounts")).
+			Where(Ident("accounts.name").Equal(String("Acme Corporation")).
+				And(Ident("employees.id").Equal(Ident("accounts.sales_person")))),
+		out: `UPDATE "employees" SET "sales_count" = "sales_count" + 1 FROM "accounts" WHERE "accounts"."name" = 'Acme Corporation' AND "employees"."id" = "accounts"."sales_person"`,
 	}} {
 		t.Run(tt.out, func(t *testing.T) {
 			out, args := tt.stmt.Build()

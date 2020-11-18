@@ -11,6 +11,12 @@ func (stmt *UpdateStmt) Set(assignments ...Assignment) *UpdateStmt {
 	return stmt
 }
 
+// From adds a FROM clause.
+func (stmt *UpdateStmt) From(items ...Expression) *UpdateStmt {
+	stmt.from = items
+	return stmt
+}
+
 // Where adds a WHERE clause.
 func (stmt *UpdateStmt) Where(condition Expression) *UpdateStmt {
 	stmt.where = &where{Expression: condition}
@@ -43,6 +49,11 @@ func (stmt *UpdateStmt) build(b *builder) {
 		stmt.assignments[i].expr.build(b)
 	}
 
+	if stmt.from != nil {
+		b.write(" ")
+		stmt.from.build(b)
+	}
+
 	if stmt.where != nil {
 		b.write(" ")
 		stmt.where.build(b)
@@ -58,6 +69,7 @@ func (stmt *UpdateStmt) build(b *builder) {
 type UpdateStmt struct {
 	table       Expression
 	assignments []Assignment
+	from        from
 	where       *where
 	returning   selectexprs
 }
