@@ -21,7 +21,8 @@ func TestAggr(t *testing.T) {
 	}, {
 		stmt: Select(AggrDistinct("count", Ident("foo"))).
 			From(Ident("bar")),
-		out: `SELECT count(DISTINCT "foo") FROM "bar"`}, {
+		out: `SELECT count(DISTINCT "foo") FROM "bar"`,
+	}, {
 		stmt: Select(Aggr("array_agg", Ident("a")).OrderBy(Order(Ident("b"), Desc))).
 			From(Ident("table")),
 		out: `SELECT array_agg("a" ORDER BY "b" DESC) FROM "table"`,
