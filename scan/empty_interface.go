@@ -1,5 +1,40 @@
 package scan
 
+import "database/sql"
+
+// Map returns one row scanned into a map[string]interface{} value. Map returns
+// sql.ErrNoRows is there are no rows.
+func Map(rows Rows) (map[string]interface{}, error) {
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return nil, sql.ErrNoRows
+	}
+
+	var scannedptrs []interface{}
+	for range columns {
+		scannedptrs = append(scannedptrs, new(interface{}))
+	}
+	if err := rows.Scan(scannedptrs...); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]interface{}, len(scannedptrs))
+	for i, ptr := range scannedptrs {
+		m[columns[i]] = *ptr.(*interface{})
+	}
+	return m, nil
+}
+
 // MapSlice returns rows scanned into a []map[string]interface{} value.
 func MapSlice(rows Rows) ([]map[string]interface{}, error) {
 	columns, err := rows.Columns()

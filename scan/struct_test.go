@@ -3,6 +3,7 @@ package scan
 import (
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"testing"
 	"time"
 )
@@ -87,5 +88,23 @@ func TestStruct(t *testing.T) {
 	}
 	if dest.Null != nil {
 		t.Errorf(`expected nil, got %s`, dest.Null)
+	}
+}
+func TestStructErrNoRows(t *testing.T) {
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{stmt: &mockStmt{rows: &mockRows{
+		columns: []string{"int", "string", "time", "null"},
+	}}}})
+	rows, err := db.Query("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var dest T
+	if err := Struct(rows, &dest); errors.Is(err, sql.ErrNoRows) {
+		// good path
+	} else if err != nil {
+		t.Fatal(err)
+	} else {
+		t.Error(`expected sql.ErrNoRows, got nil`)
 	}
 }
