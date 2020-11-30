@@ -58,6 +58,39 @@ func MapSlice(rows Rows) ([]map[string]interface{}, error) {
 	return maps, nil
 }
 
+// Slice returns one row scanned into a []]interface{} value. Slice returns
+// sql.ErrNoRows is there are no rows.
+func Slice(rows Rows) ([]interface{}, error) {
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return nil, sql.ErrNoRows
+	}
+
+	var scannedptrs []interface{}
+	for range columns {
+		scannedptrs = append(scannedptrs, new(interface{}))
+	}
+	if err := rows.Scan(scannedptrs...); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	values := make([]interface{}, len(scannedptrs))
+	for i, ptr := range scannedptrs {
+		values[i] = *ptr.(*interface{})
+	}
+	return values, nil
+}
+
 // SliceSlice returns rows scanned into a [][]interface{} value.
 func SliceSlice(rows Rows) ([][]interface{}, error) {
 	columns, err := rows.Columns()
