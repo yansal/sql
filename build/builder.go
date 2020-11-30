@@ -14,7 +14,7 @@ type builder struct {
 
 func (b *builder) bind(value interface{}) {
 	switch v := value.(type) {
-	case bool, float64, int, int64, string, []byte, time.Time, driver.Valuer:
+	case bool, float64, int, int64, string, []byte, time.Time, driver.Valuer, nil:
 		b.params = append(b.params, value)
 		fmt.Fprintf(&b.buf, "$%d", len(b.params))
 	case []int64:
