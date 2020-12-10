@@ -37,6 +37,10 @@ func (stmt *UpdateStmt) Build() (string, []interface{}) {
 }
 
 func (stmt *UpdateStmt) build(b *builder) {
+	if stmt.ctes != nil {
+		stmt.ctes.build(b)
+	}
+
 	b.write("UPDATE ")
 	stmt.table.build(b)
 	b.write(" SET ")
@@ -67,6 +71,7 @@ func (stmt *UpdateStmt) build(b *builder) {
 
 // A UpdateStmt is an UPDATE statement.
 type UpdateStmt struct {
+	ctes        *CTEs
 	table       Expression
 	assignments []Assignment
 	from        from

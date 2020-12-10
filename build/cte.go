@@ -26,6 +26,11 @@ func (e *CTEs) Select(exprs ...Expression) *SelectStmt {
 	return &SelectStmt{ctes: e, exprs: exprs}
 }
 
+// Update starts a new update statement attached to e.
+func (e *CTEs) Update(table string) *UpdateStmt {
+	return &UpdateStmt{ctes: e, table: Ident(table)}
+}
+
 func (e *CTEs) build(b *builder) {
 	b.write("WITH ")
 	for i, cte := range e.ctes {
