@@ -27,12 +27,17 @@ type InfixExpr struct {
 }
 
 func (i *InfixExpr) build(b *builder) {
-	i.left.build(b)
+	if i.left != nil {
+		i.left.build(b)
+	}
 
 	if i.op == "" {
 		return
 	}
-	b.write(" " + i.op)
+	if i.left != nil {
+		b.write(" ")
+	}
+	b.write(i.op)
 
 	if i.right == nil {
 		return
@@ -175,4 +180,9 @@ type raw string
 
 func (r raw) build(b *builder) {
 	b.write(string(r))
+}
+
+// Not adds the NOT operator to an expression.
+func Not(expr Expression) *InfixExpr {
+	return &InfixExpr{left: nil, op: "NOT", right: expr}
 }
