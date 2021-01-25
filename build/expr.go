@@ -61,6 +61,11 @@ func (i *InfixExpr) Equal(right Expression) *InfixExpr {
 	return i.Op("=", right)
 }
 
+// NotEqual invokes the != operator.
+func (i *InfixExpr) NotEqual(right Expression) *InfixExpr {
+	return i.Op("!=", right)
+}
+
 // In invokes the IN operator.
 func (i *InfixExpr) In(right Expression) *InfixExpr {
 	return i.Op("IN", right)
