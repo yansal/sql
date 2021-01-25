@@ -9,19 +9,22 @@ func TestJoin(t *testing.T) {
 		args []interface{}
 	}{{
 		stmt: Select(Columns("t1.foo", "t2.bar")...).
-			From(Join(
-				Ident("t1"),
-				Ident("t2"),
-			).On(
-				Ident("t1.user_id").Equal(Ident("t2.id")),
-			)),
+			From(FromItem(Ident("t1")).Join(Ident("t2")).On(Ident("t1.user_id").Equal(Ident("t2.id")))),
 		out: `SELECT "t1"."foo", "t2"."bar" FROM "t1" JOIN "t2" ON "t1"."user_id" = "t2"."id"`,
 	}, {
 		stmt: Select(Columns("t1.foo", "t2.bar")...).
-			From(Join(
-				Ident("t1"),
-				Ident("t2"),
-			).On(
+			From(FromItem(Ident("t1")).LeftJoin(Ident("t2")).On(Ident("t1.user_id").Equal(Ident("t2.id")))),
+		out: `SELECT "t1"."foo", "t2"."bar" FROM "t1" LEFT JOIN "t2" ON "t1"."user_id" = "t2"."id"`,
+	}, {
+		stmt: Select(Columns("t1.foo", "t2.bar", "t3.baz")...).
+			From(FromItem(Ident("t1")).
+				Join(Ident("t2")).On(Ident("t1.id").Equal(Ident("t2.id"))).
+				Join(Ident("t3")).On(Ident("t2.id").Equal(Ident("t3.id"))),
+			),
+		out: `SELECT "t1"."foo", "t2"."bar", "t3"."baz" FROM "t1" JOIN "t2" ON "t1"."id" = "t2"."id" JOIN "t3" ON "t2"."id" = "t3"."id"`,
+	}, {
+		stmt: Select(Columns("t1.foo", "t2.bar")...).
+			From(FromItem(Ident("t1")).Join(Ident("t2")).On(
 				CallExpr("date_trunc", String("month"), Ident("t1.foo")).Equal(Ident("t2.bar")),
 			)),
 		out: `SELECT "t1"."foo", "t2"."bar" FROM "t1" JOIN "t2" ON date_trunc('month', "t1"."foo") = "t2"."bar"`,
