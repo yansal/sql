@@ -8,6 +8,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/yansal/sql/build"
 )
 
@@ -83,6 +84,17 @@ func (r *mockRows) Next(values []driver.Value) error {
 	return nil
 }
 
+type Avatar struct {
+	CustomerID int64 `scan:"customer_id"`
+}
+
+type Customer struct {
+	ID int64 `scan:"id"`
+
+	Avatar *Avatar `preload:"avatars.customer_id = id"`
+	Orders []Order `preload:"orders.customer_id = id"`
+}
+
 type Order struct {
 	ID                int64         `scan:"id"`
 	CustomerID        int64         `scan:"customer_id"`
@@ -90,12 +102,6 @@ type Order struct {
 
 	Customer        *Customer        `preload:"customers.id = customer_id"`
 	ShippingAddress *ShippingAddress `preload:"shipping_addresses.id = shipping_address_id"`
-}
-
-type Customer struct {
-	ID int64 `scan:"id"`
-
-	Orders []Order `preload:"orders.customer_id = id"`
 }
 
 type ShippingAddress struct {
@@ -213,6 +219,42 @@ func TestStructSlicePreloadPointer(t *testing.T) {
 		assertf(t, orders[i].Customer.ID == orders[i].CustomerID,
 			"expected orders[%d].Customer.ID to equal %d, got %d", i, orders[i].CustomerID, orders[i].Customer.ID)
 	}
+}
+
+func TestStructSlicePreloadPointer2(t *testing.T) {
+	ctx := context.Background()
+	var (
+		customer1ID int64 = 1
+		customer2ID int64 = 2
+	)
+	queryfunc := func(values []driver.Value) (driver.Rows, error) {
+		expect := []driver.Value{customer1ID, customer2ID}
+		assertValuesEqual(t, values, expect)
+		return &mockRows{
+			columns: []string{"customer_id"},
+			values: [][]driver.Value{
+				{customer1ID},
+			},
+		}, nil
+	}
+	preparefunc := func(query string) (driver.Stmt, error) {
+		expect := `SELECT "customer_id" FROM "avatars" WHERE "customer_id" IN ($1, $2)`
+		assertf(t, query == expect, "expected %q, got %q", expect, query)
+		return &mockStmt{queryfunc: queryfunc}, nil
+	}
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
+
+	customers := []Customer{
+		{ID: customer1ID},
+		{ID: customer2ID},
+	}
+	if err := StructSlice(ctx, db, customers, []Field{{Name: "Avatar"}}); err != nil {
+		t.Fatal(err)
+	}
+	assertf(t, customers[0].Avatar != nil, "expected customers[%d].Avatar to not be nil", 0)
+	assertf(t, customers[0].ID == customers[0].Avatar.CustomerID,
+		"expected customers[%d].Avatar.CustomerID to equal %d, got %d", 0, customers[0].ID, customers[0].Avatar.CustomerID)
+	assertf(t, customers[1].Avatar == nil, "expected customers[%d].Avatar to not be nil", 1)
 }
 
 func TestStructSlicePreloadSlice(t *testing.T) {
@@ -534,3 +576,70 @@ func TestNestedSkipOneLevel(t *testing.T) {
 	assertf(t, customer.Orders[1].ShippingAddress == nil,
 		"expected customer.Orders[1].ShippingAddress to be nil")
 }
+
+func TestStructWithCache(t *testing.T) {
+	ctx := context.Background()
+	var (
+		customer1ID int64 = 1
+		customer2ID int64 = 2
+	)
+	queryfunc := func(values []driver.Value) (driver.Rows, error) {
+		expect := []driver.Value{customer1ID, customer2ID}
+		assertValuesEqual(t, values, expect)
+		return &mockRows{
+			columns: []string{"id"},
+			values: [][]driver.Value{
+				{customer1ID},
+				{customer2ID},
+			},
+		}, nil
+	}
+	preparefunc := func(query string) (driver.Stmt, error) {
+		expect := `SELECT "id" FROM "customers" WHERE "id" IN ($1, $2)`
+		assertf(t, query == expect, "expected %q, got %q", expect, query)
+		return &mockStmt{queryfunc: queryfunc}, nil
+	}
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
+
+	orders := []Order{
+		{CustomerID: customer1ID},
+		{CustomerID: customer2ID},
+	}
+
+	redisclient := redis.NewClient(&redis.Options{})
+	redisclient.AddHook(newhook(t))
+	if err := redisclient.FlushAll(ctx).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := StructSlice(ctx, db, orders,
+		[]Field{
+			{Name: "Customer", Cached: true},
+		},
+		WithCache(NewRedisCache(redisclient)),
+	); err != nil {
+		t.Fatal(err)
+	}
+	for i := range orders {
+		assertf(t, orders[i].Customer != nil, "expected orders[%d].Customer to not be nil", i)
+		assertf(t, orders[i].Customer.ID == orders[i].CustomerID,
+			"expected orders[%d].Customer.ID to equal %d, got %d", i, orders[i].CustomerID, orders[i].Customer.ID)
+	}
+}
+
+func newhook(t *testing.T) *hook {
+	return &hook{t: t}
+}
+
+type hook struct{ t *testing.T }
+
+func (h *hook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.Context, error) {
+	return ctx, nil
+}
+func (h *hook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
+	h.t.Log(cmd)
+	return nil
+}
+func (h *hook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder) (context.Context, error) {
+	return ctx, nil
+}
+func (h *hook) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error { return nil }
