@@ -18,12 +18,23 @@ type Rows interface {
 // StructSlice scans rows to dest, which must be a pointer to a slice of
 // structs.
 func StructSlice(rows Rows, dest interface{}) error {
-	slicevalue := reflect.ValueOf(dest).Elem()
-	structtype := slicevalue.Type().Elem()
+	destvalue := reflect.ValueOf(dest)
+	if kind := destvalue.Kind(); kind != reflect.Ptr {
+		panic(fmt.Sprintf("scan: dest has kind %s, must be a pointer to a slice of structs", kind))
+	}
 
-	structfields := make([]reflect.StructField, 0, structtype.NumField())
-	for i := 0; i < structtype.NumField(); i++ {
-		structfields = append(structfields, structtype.Field(i))
+	var (
+		slicevalue = destvalue.Elem()
+		structtype = slicevalue.Type().Elem()
+	)
+	if kind := structtype.Kind(); kind != reflect.Struct {
+		panic(fmt.Sprintf("scan: dest is a pointer to a slice of values of kind %s, must be a pointer to a slice of structs", kind))
+	}
+
+	numfield := structtype.NumField()
+	fields := make([]reflect.StructField, 0, numfield)
+	for i := 0; i < numfield; i++ {
+		fields = append(fields, structtype.Field(i))
 	}
 
 	columns, err := rows.Columns()
@@ -34,7 +45,7 @@ func StructSlice(rows Rows, dest interface{}) error {
 	var fieldindexes [][]int
 	for _, col := range columns {
 		var ok bool
-		for _, field := range structfields {
+		for _, field := range fields {
 			if col == field.Tag.Get("scan") {
 				fieldindexes = append(fieldindexes, field.Index)
 				ok = true
@@ -42,7 +53,7 @@ func StructSlice(rows Rows, dest interface{}) error {
 			}
 		}
 		if !ok {
-			return fmt.Errorf("scan: couldn't map column %q", col)
+			return fmt.Errorf("scan: couldn't map column %s", col)
 		}
 	}
 
@@ -63,11 +74,22 @@ func StructSlice(rows Rows, dest interface{}) error {
 // Struct scans rows to dest, which must be a pointer to struct. Struct returns
 // sql.ErrNoRows is there are no rows.
 func Struct(rows Rows, dest interface{}) error {
-	structvalue := reflect.ValueOf(dest).Elem()
-	structtype := structvalue.Type()
+	destvalue := reflect.ValueOf(dest)
+	if kind := destvalue.Kind(); kind != reflect.Ptr {
+		panic(fmt.Sprintf("scan: dest has kind %s, must be a pointer to struct", kind))
+	}
 
-	fields := make([]reflect.StructField, 0, structtype.NumField())
-	for i := 0; i < structtype.NumField(); i++ {
+	var (
+		structvalue = destvalue.Elem()
+		structtype  = structvalue.Type()
+	)
+	if kind := structtype.Kind(); kind != reflect.Struct {
+		panic(fmt.Sprintf("scan: dest is a pointer to a value of kind %s, must be a pointer to struct", kind))
+	}
+
+	numfield := structtype.NumField()
+	fields := make([]reflect.StructField, 0, numfield)
+	for i := 0; i < numfield; i++ {
 		fields = append(fields, structtype.Field(i))
 	}
 
@@ -94,7 +116,7 @@ func Struct(rows Rows, dest interface{}) error {
 			}
 		}
 		if !ok {
-			return fmt.Errorf("scan: couldn't map column %q", col)
+			return fmt.Errorf("scan: couldn't map column %s", col)
 		}
 	}
 
