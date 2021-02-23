@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"io"
 	"testing"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/yansal/sql/build"
 )
 
@@ -90,8 +92,8 @@ type Avatar struct {
 type Customer struct {
 	ID int64 `scan:"id"`
 
-	Avatar *Avatar `preload:"avatars.customer_id = id"`
-	Orders []Order `preload:"orders.customer_id = id"`
+	Avatar *Avatar `json:"-" preload:"avatars.customer_id = id"`
+	Orders []Order `json:"-" preload:"orders.customer_id = id"`
 }
 
 type Order struct {
@@ -574,4 +576,212 @@ func TestNestedSkipOneLevel(t *testing.T) {
 
 	assertf(t, customer.Orders[1].ShippingAddress == nil,
 		"expected customer.Orders[1].ShippingAddress to be nil")
+}
+
+func TestStructSliceBeforeQueryFilter(t *testing.T) {
+	ctx := context.Background()
+	var (
+		customer1ID int64 = 1
+		customer2ID int64 = 2
+	)
+	queryfunc := func(values []driver.Value) (driver.Rows, error) {
+		expect := []driver.Value{customer1ID}
+		assertValuesEqual(t, values, expect)
+		return &mockRows{
+			columns: []string{"id"},
+			values: [][]driver.Value{
+				{customer1ID},
+			},
+		}, nil
+	}
+	preparefunc := func(query string) (driver.Stmt, error) {
+		expect := `SELECT "id" FROM "customers" WHERE "id" IN ($1)`
+		assertf(t, query == expect, "expected %q, got %q", expect, query)
+		return &mockStmt{queryfunc: queryfunc}, nil
+	}
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
+
+	orders := []Order{
+		{CustomerID: customer1ID},
+		{CustomerID: customer2ID},
+	}
+
+	if err := StructSlice(ctx, db, orders, []Field{{
+		Name: "Customer",
+		BeforeQuery: func(ctx context.Context, dest interface{}) (interface{}, error) {
+			orders := dest.([]*Order)
+			var n int
+			for _, order := range orders {
+				if order.CustomerID == customer1ID {
+					orders[n] = order
+					n++
+				}
+			}
+			return orders[:n], nil
+		},
+	}},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	assertf(t, orders[0].Customer != nil, "expected orders[0].Customer to not be nil")
+	assertf(t, orders[0].Customer.ID == orders[0].CustomerID,
+		"expected orders[0].Customer.ID to equal %d, got %d", orders[0].CustomerID, orders[0].Customer.ID)
+	assertf(t, orders[1].Customer == nil, "expected orders[1].Customer to be nil")
+}
+
+func TestStructSliceBeforeQueryCache(t *testing.T) {
+	ctx := context.Background()
+	var (
+		customer1ID int64 = 1
+		customer2ID int64 = 2
+	)
+	queryfunc := func(values []driver.Value) (driver.Rows, error) {
+		expect := []driver.Value{customer2ID}
+		assertValuesEqual(t, values, expect)
+		return &mockRows{
+			columns: []string{"id"},
+			values: [][]driver.Value{
+				{customer2ID},
+			},
+		}, nil
+	}
+	preparefunc := func(query string) (driver.Stmt, error) {
+		expect := `SELECT "id" FROM "customers" WHERE "id" IN ($1)`
+		assertf(t, query == expect, "expected %q, got %q", expect, query)
+		return &mockStmt{queryfunc: queryfunc}, nil
+	}
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
+
+	orders := []Order{
+		{CustomerID: customer1ID},
+		{CustomerID: customer2ID},
+	}
+
+	redisclient := redis.NewClient(&redis.Options{})
+	redisclient.AddHook(newredishook(t))
+	if err := redisclient.FlushAll(ctx).Err(); err != nil {
+		t.Fatal(err)
+	}
+	cache := NewRedisCache(redisclient)
+
+	customer1value, err := json.Marshal(Customer{ID: customer1ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cache.Set(ctx, "customers", map[string]string{
+		fmt.Sprint(customer1ID): string(customer1value),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := StructSlice(ctx, db, orders, []Field{{
+		Name:        "Customer",
+		BeforeQuery: ordersCustomersBeforeQuery(cache),
+	}},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range orders {
+		assertf(t, orders[i].Customer != nil, "expected orders[%d].Customer to not be nil", i)
+		assertf(t, orders[i].Customer.ID == orders[i].CustomerID,
+			"expected orders[%d].Customer.ID to equal %d, got %d", i, orders[i].CustomerID, orders[i].Customer.ID)
+	}
+}
+
+func ordersCustomersBeforeQuery(cache Cache) func(ctx context.Context, dest interface{}) (interface{}, error) {
+	return func(ctx context.Context, dest interface{}) (interface{}, error) {
+		orders := dest.([]*Order)
+
+		cachefields := make([]string, 0, len(orders))
+		for i := range orders {
+			cachefields = append(cachefields, fmt.Sprint(orders[i].CustomerID))
+		}
+		values, err := cache.Get(ctx, "customers", cachefields...)
+		if err != nil {
+			return nil, err
+		}
+
+		var notcached []*Order
+		for i := range values {
+			if values[i] == "" {
+				notcached = append(notcached, orders[i])
+				continue
+			}
+			var customer Customer
+			if err := json.Unmarshal([]byte(values[i]), &customer); err != nil {
+				return nil, err
+			}
+			orders[i].Customer = &customer
+		}
+		return notcached, nil
+	}
+}
+
+func TestStructSliceAfterQueryCache(t *testing.T) {
+	ctx := context.Background()
+	var (
+		customer1ID int64 = 1
+		customer2ID int64 = 2
+	)
+	queryfunc := func(values []driver.Value) (driver.Rows, error) {
+		expect := []driver.Value{customer1ID, customer2ID}
+		assertValuesEqual(t, values, expect)
+		return &mockRows{
+			columns: []string{"id"},
+			values: [][]driver.Value{
+				{customer1ID},
+				{customer2ID},
+			},
+		}, nil
+	}
+	preparefunc := func(query string) (driver.Stmt, error) {
+		expect := `SELECT "id" FROM "customers" WHERE "id" IN ($1, $2)`
+		assertf(t, query == expect, "expected %q, got %q", expect, query)
+		return &mockStmt{queryfunc: queryfunc}, nil
+	}
+	db := sql.OpenDB(&mockConnector{conn: &mockConn{preparefunc: preparefunc}})
+
+	orders := []Order{
+		{CustomerID: customer1ID},
+		{CustomerID: customer2ID},
+	}
+
+	redisclient := redis.NewClient(&redis.Options{})
+	redisclient.AddHook(newredishook(t))
+	if err := redisclient.FlushAll(ctx).Err(); err != nil {
+		t.Fatal(err)
+	}
+	cache := NewRedisCache(redisclient)
+
+	if err := StructSlice(ctx, db, orders, []Field{{
+		Name:       "Customer",
+		AfterQuery: ordersCustomersAfterQuery(cache),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	for i := range orders {
+		assertf(t, orders[i].Customer != nil, "expected orders[%d].Customer to not be nil", i)
+		assertf(t, orders[i].Customer.ID == orders[i].CustomerID,
+			"expected orders[%d].Customer.ID to equal %d, got %d", i, orders[i].CustomerID, orders[i].Customer.ID)
+	}
+}
+
+func ordersCustomersAfterQuery(cache Cache) func(ctx context.Context, dest interface{}) error {
+	return func(ctx context.Context, dest interface{}) error {
+		orders := dest.([]*Order)
+		values := make(map[string]string)
+		for i := range orders {
+			if orders[i].Customer == nil {
+				continue
+			}
+			b, err := json.Marshal(orders[i].Customer)
+			if err != nil {
+				return err
+			}
+			values[fmt.Sprint(orders[i].Customer.ID)] = string(b)
+		}
+		return cache.Set(ctx, "customers", values)
+	}
 }

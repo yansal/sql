@@ -24,6 +24,9 @@ type Field struct {
 	Name    string
 	Where   build.Expression
 	OrderBy []build.Expression
+
+	BeforeQuery func(ctx context.Context, dest interface{}) (interface{}, error)
+	AfterQuery  func(ctx context.Context, dest interface{}) error
 }
 
 // Struct preloads fields into dest, which must be a pointer to a struct.
@@ -89,6 +92,14 @@ func preload(ctx context.Context, db Querier, slicevalue reflect.Value, field Fi
 		return nil
 	}
 
+	if field.BeforeQuery != nil {
+		v, err := field.BeforeQuery(ctx, parents.slicevalue.Interface())
+		if err != nil {
+			return err
+		}
+		parents.slicevalue = reflect.ValueOf(v)
+	}
+
 	query, err := parents.setupquery()
 	if err != nil {
 		return err
@@ -109,6 +120,12 @@ func preload(ctx context.Context, db Querier, slicevalue reflect.Value, field Fi
 	}
 
 	parents.set(res)
+
+	if field.AfterQuery != nil {
+		if err := field.AfterQuery(ctx, parents.slicevalue.Interface()); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
