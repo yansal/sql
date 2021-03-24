@@ -9,8 +9,8 @@ import (
 type Expression interface{ build(*builder) }
 
 // Bind binds a value.
-func Bind(value interface{}) Expression {
-	return &bind{value: value}
+func Bind(value interface{}) *InfixExpr {
+	return &InfixExpr{left: &bind{value: value}}
 }
 
 type bind struct{ value interface{} }
