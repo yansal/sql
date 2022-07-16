@@ -16,19 +16,25 @@ func InsertInto(table string, columns ...string) *InsertStmt {
 
 // DefaultValues adds the DEFAULT VALUES keyword.
 func (stmt *InsertStmt) DefaultValues() *InsertStmt {
-	stmt.values = defaultvalues{}
+	stmt.valueslist = defaultvalues{}
 	return stmt
 }
 
 // Values adds VALUES.
 func (stmt *InsertStmt) Values(values ...Expression) *InsertStmt {
-	stmt.values = valuesexpr{values: values}
+	stmt.valueslist = valueslistexpr{valueslist: []Values{values}}
+	return stmt
+}
+
+// ValuesList adds VALUES with multiple rows.
+func (stmt *InsertStmt) ValuesList(valueslist ...Values) *InsertStmt {
+	stmt.valueslist = valueslistexpr{valueslist: valueslist}
 	return stmt
 }
 
 // Query adds a query.
 func (stmt *InsertStmt) Query(query Expression) *InsertStmt {
-	stmt.values = queryexpr{query: query}
+	stmt.valueslist = queryexpr{query: query}
 	return stmt
 }
 
@@ -38,19 +44,18 @@ func (defaultvalues) build(b *builder) {
 	b.write("DEFAULT VALUES")
 }
 
-type valuesexpr struct {
-	values []Expression
+type valueslistexpr struct {
+	valueslist []Values
 }
 
-func (e valuesexpr) build(b *builder) {
-	b.write("VALUES (")
-	for i := range e.values {
+func (e valueslistexpr) build(b *builder) {
+	b.write("VALUES ")
+	for i := range e.valueslist {
 		if i > 0 {
 			b.write(", ")
 		}
-		e.values[i].build(b)
+		e.valueslist[i].build(b)
 	}
-	b.write(")")
 }
 
 type queryexpr struct {
@@ -183,7 +188,7 @@ func (stmt *InsertStmt) build(b *builder) {
 		b.write(") ")
 	}
 
-	stmt.values.build(b)
+	stmt.valueslist.build(b)
 
 	if stmt.onconflict != nil {
 		b.write(" ")
@@ -200,7 +205,7 @@ func (stmt *InsertStmt) build(b *builder) {
 type InsertStmt struct {
 	table      Expression
 	columns    []Expression
-	values     Expression
+	valueslist Expression
 	onconflict *onconflictexpr
 	returning  selectexprs
 }
@@ -217,4 +222,17 @@ func Assign(columnname string, expr Expression) Assignment {
 type Assignment struct {
 	columnname Expression
 	expr       Expression
+}
+
+type Values []Expression
+
+func (v Values) build(b *builder) {
+	b.write("(")
+	for i := range v {
+		if i > 0 {
+			b.write(", ")
+		}
+		v[i].build(b)
+	}
+	b.write(")")
 }

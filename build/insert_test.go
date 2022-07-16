@@ -22,6 +22,14 @@ func TestInsert(t *testing.T) {
 		args: []interface{}{"hello", 1},
 	}, {
 		stmt: InsertInto("table").
+			ValuesList(
+				Values{Bind("hello"), Bind(1)},
+				Values{Bind("world"), Bind(2)},
+			),
+		out:  `INSERT INTO "table" VALUES ($1, $2), ($3, $4)`,
+		args: []interface{}{"hello", 1, "world", 2},
+	}, {
+		stmt: InsertInto("table").
 			Query(Select(Ident("foo")).
 				From(Ident("bar")).
 				Where(Ident("baz").Equal(Bind(1))),
