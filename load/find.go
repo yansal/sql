@@ -21,9 +21,9 @@ func Find[
 }
 
 type FindQuery struct {
-	where  build.Expression
-	orders []build.Expression
-	limit  *int
+	Where  build.Expression
+	Orders []build.Expression
+	Limit  *int
 }
 
 func find[
@@ -40,14 +40,14 @@ func find[
 	)
 	stmt := build.Select(build.Columns(columns...)...).
 		From(build.Ident(table))
-	if q.where != nil {
-		stmt = stmt.Where(q.where)
+	if q.Where != nil {
+		stmt = stmt.Where(q.Where)
 	}
-	if q.orders != nil {
-		stmt = stmt.OrderBy(q.orders...)
+	if q.Orders != nil {
+		stmt = stmt.OrderBy(q.Orders...)
 	}
-	if q.limit != nil {
-		stmt = stmt.Limit(build.Bind(*q.limit))
+	if q.Limit != nil {
+		stmt = stmt.Limit(build.Bind(*q.Limit))
 	}
 	query, args := stmt.Build()
 
