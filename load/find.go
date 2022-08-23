@@ -12,12 +12,18 @@ func Find[
 		*T
 		Model
 	},
-](ctx context.Context, db Querier, where build.Expression) ([]T, error) {
+](ctx context.Context, db Querier, q *FindQuery) ([]T, error) {
 	var dest []T
-	if err := find[T, PtrToT](ctx, db, &dest, where); err != nil {
+	if err := find[T, PtrToT](ctx, db, &dest, q); err != nil {
 		return nil, err
 	}
 	return dest, nil
+}
+
+type FindQuery struct {
+	where  build.Expression
+	orders []build.Expression
+	limit  *int
 }
 
 func find[
@@ -26,16 +32,24 @@ func find[
 		*T
 		Model
 	},
-](ctx context.Context, db Querier, dest *[]T, where build.Expression) error {
+](ctx context.Context, db Querier, dest *[]T, q *FindQuery) error {
 	var (
 		model   PtrToT
 		columns = model.GetColumns()
 		table   = model.GetTable()
 	)
-	query, args := build.Select(build.Columns(columns...)...).
-		From(build.Ident(table)).
-		Where(where).
-		Build()
+	stmt := build.Select(build.Columns(columns...)...).
+		From(build.Ident(table))
+	if q.where != nil {
+		stmt = stmt.Where(q.where)
+	}
+	if q.orders != nil {
+		stmt = stmt.OrderBy(q.orders...)
+	}
+	if q.limit != nil {
+		stmt = stmt.Limit(build.Bind(*q.limit))
+	}
+	query, args := stmt.Build()
 
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {

@@ -59,7 +59,7 @@ func PreloadSlice[
 		srcmodel PtrToPreloadSrc
 		where    = build.Ident(srcmodel.GetPreloadDestIdent(destname)).In(build.Bind(bindvalues))
 	)
-	dests, err := Find[PreloadDest, PtrToPreloadDest](ctx, db, where)
+	dests, err := Find[PreloadDest, PtrToPreloadDest](ctx, db, &FindQuery{where: where})
 	if err != nil {
 		return err
 	}
