@@ -21,9 +21,16 @@ func Find[
 }
 
 type FindQuery struct {
+	Joins  []FindQueryJoin
 	Where  build.Expression
 	Orders []build.Expression
 	Limit  *int
+}
+
+type FindQueryJoin struct {
+	Left  bool
+	Right build.Expression
+	On    build.Expression
 }
 
 func find[
@@ -38,8 +45,19 @@ func find[
 		columns = model.GetColumns()
 		table   = model.GetTable()
 	)
-	stmt := build.Select(build.Columns(columns...)...).
-		From(build.Ident(table))
+	for i := range columns {
+		columns[i] = table + "." + columns[i]
+	}
+	stmt := build.Select(build.Columns(columns...)...)
+	fromitem := build.FromItem(build.Ident(table))
+	for i := range q.Joins {
+		joinexpr := fromitem.Join(q.Joins[i].Right)
+		if q.Joins[i].Left {
+			joinexpr = fromitem.LeftJoin(q.Joins[i].Right)
+		}
+		fromitem = joinexpr.On(q.Joins[i].On)
+	}
+	stmt = stmt.From(fromitem)
 	if q.Where != nil {
 		stmt = stmt.Where(q.Where)
 	}
