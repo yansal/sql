@@ -7,16 +7,6 @@ import (
 	"github.com/yansal/sql/build"
 )
 
-type Model interface {
-	GetColumns() []string
-	GetTable() string
-	GetDests() []any
-}
-
-type Querier interface {
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-}
-
 func Get[
 	T any,
 	PtrToT interface {

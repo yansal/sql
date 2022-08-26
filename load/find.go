@@ -12,25 +12,39 @@ func Find[
 		*T
 		Model
 	},
-](ctx context.Context, db Querier, q *FindQuery) ([]T, error) {
+](ctx context.Context, db Querier, options ...FindOption) ([]T, error) {
 	var dest []T
-	if err := find[T, PtrToT](ctx, db, &dest, q); err != nil {
+	if err := find[T, PtrToT](ctx, db, &dest, options...); err != nil {
 		return nil, err
 	}
 	return dest, nil
 }
 
-type FindQuery struct {
-	Joins  []FindQueryJoin
-	Where  build.Expression
-	Orders []build.Expression
-	Limit  *int
+type FindOption func(o *FindOptions)
+type FindOptions struct {
+	joins  []FindOptionsJoin
+	where  build.Expression
+	orders []build.Expression
+	limit  *int
 }
 
-type FindQueryJoin struct {
+type FindOptionsJoin struct {
 	Left  bool
 	Right build.Expression
 	On    build.Expression
+}
+
+func WithLimit(limit int) FindOption {
+	return func(o *FindOptions) { o.limit = &limit }
+}
+func WithJoins(joins []FindOptionsJoin) FindOption {
+	return func(o *FindOptions) { o.joins = joins }
+}
+func WithOrders(orders []build.Expression) FindOption {
+	return func(o *FindOptions) { o.orders = orders }
+}
+func WithWhere(where build.Expression) FindOption {
+	return func(o *FindOptions) { o.where = where }
 }
 
 func find[
@@ -39,7 +53,11 @@ func find[
 		*T
 		Model
 	},
-](ctx context.Context, db Querier, dest *[]T, q *FindQuery) error {
+](ctx context.Context, db Querier, dest *[]T, options ...FindOption) error {
+	var opts FindOptions
+	for i := range options {
+		options[i](&opts)
+	}
 	var (
 		model   PtrToT
 		columns = model.GetColumns()
@@ -50,22 +68,22 @@ func find[
 	}
 	stmt := build.Select(build.Columns(columns...)...)
 	fromitem := build.FromItem(build.Ident(table))
-	for i := range q.Joins {
-		joinexpr := fromitem.Join(q.Joins[i].Right)
-		if q.Joins[i].Left {
-			joinexpr = fromitem.LeftJoin(q.Joins[i].Right)
+	for i := range opts.joins {
+		joinexpr := fromitem.Join(opts.joins[i].Right)
+		if opts.joins[i].Left {
+			joinexpr = fromitem.LeftJoin(opts.joins[i].Right)
 		}
-		fromitem = joinexpr.On(q.Joins[i].On)
+		fromitem = joinexpr.On(opts.joins[i].On)
 	}
 	stmt = stmt.From(fromitem)
-	if q.Where != nil {
-		stmt = stmt.Where(q.Where)
+	if opts.where != nil {
+		stmt = stmt.Where(opts.where)
 	}
-	if q.Orders != nil {
-		stmt = stmt.OrderBy(q.Orders...)
+	if opts.orders != nil {
+		stmt = stmt.OrderBy(opts.orders...)
 	}
-	if q.Limit != nil {
-		stmt = stmt.Limit(build.Bind(*q.Limit))
+	if opts.limit != nil {
+		stmt = stmt.Limit(build.Bind(*opts.limit))
 	}
 	query, args := stmt.Build()
 

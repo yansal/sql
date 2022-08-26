@@ -59,7 +59,7 @@ func PreloadSlice[
 		srcmodel PtrToPreloadSrc
 		where    = build.Ident(srcmodel.GetPreloadDestIdent(destname)).In(build.Bind(bindvalues))
 	)
-	dests, err := Find[PreloadDest, PtrToPreloadDest](ctx, db, &FindQuery{Where: where})
+	dests, err := Find[PreloadDest, PtrToPreloadDest](ctx, db, WithWhere(where))
 	if err != nil {
 		return err
 	}
@@ -67,6 +67,16 @@ func PreloadSlice[
 	destmap := make(map[any][]PreloadDest)
 	for i := range dests {
 		destvalue := srcmodel.GetPreloadDestValue(destname, dests[i])
+		if valuer, ok := destvalue.(driver.Valuer); ok {
+			value, err := valuer.Value()
+			if err != nil {
+				return err
+			}
+			if value == nil {
+				continue
+			}
+			destvalue = value
+		}
 		destmap[destvalue] = append(destmap[destvalue], dests[i])
 	}
 	for i := range srcs {
