@@ -191,3 +191,15 @@ func (r raw) build(b *builder) {
 func Not(expr Expression) *InfixExpr {
 	return &InfixExpr{left: nil, op: "NOT", right: expr}
 }
+
+func ParenExpr(expr Expression) *InfixExpr {
+	return &InfixExpr{left: &parenExpr{expr: expr}}
+}
+
+type parenExpr struct{ expr Expression }
+
+func (p *parenExpr) build(b *builder) {
+	b.write("(")
+	p.expr.build(b)
+	b.write(")")
+}
