@@ -23,9 +23,9 @@ func (c CaseExpr) When(condition Expression, result Expression) CaseExpr {
 }
 
 // Else adds a ELSE clause.
-func (c CaseExpr) Else(result Expression) Expression {
+func (c CaseExpr) Else(result Expression) *InfixExpr {
 	c.elseresult = result
-	return c
+	return &InfixExpr{left: c}
 }
 
 func (c CaseExpr) build(b *builder) {
