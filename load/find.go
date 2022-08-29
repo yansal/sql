@@ -26,6 +26,7 @@ type FindOptions struct {
 	where  build.Expression
 	orders []build.Expression
 	limit  *int
+	offset *int
 }
 
 type FindOptionsJoin struct {
@@ -36,6 +37,9 @@ type FindOptionsJoin struct {
 
 func WithLimit(limit int) FindOption {
 	return func(o *FindOptions) { o.limit = &limit }
+}
+func WithOffset(offset int) FindOption {
+	return func(o *FindOptions) { o.offset = &offset }
 }
 func WithJoins(joins []FindOptionsJoin) FindOption {
 	return func(o *FindOptions) { o.joins = joins }
@@ -84,6 +88,9 @@ func find[
 	}
 	if opts.limit != nil {
 		stmt = stmt.Limit(build.Bind(*opts.limit))
+	}
+	if opts.offset != nil {
+		stmt = stmt.Offset(build.Bind(*opts.offset))
 	}
 	query, args := stmt.Build()
 
