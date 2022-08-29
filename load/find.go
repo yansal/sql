@@ -30,9 +30,9 @@ type FindOptions struct {
 }
 
 type FindOptionsJoin struct {
-	Left  bool
-	Right build.Expression
-	On    build.Expression
+	Left      bool
+	RightSide build.Expression
+	On        build.Expression
 }
 
 func WithLimit(limit int) FindOption {
@@ -73,9 +73,9 @@ func find[
 	stmt := build.Select(build.Columns(columns...)...)
 	fromitem := build.FromItem(build.Ident(table))
 	for i := range opts.joins {
-		joinexpr := fromitem.Join(opts.joins[i].Right)
+		joinexpr := fromitem.Join(opts.joins[i].RightSide)
 		if opts.joins[i].Left {
-			joinexpr = fromitem.LeftJoin(opts.joins[i].Right)
+			joinexpr = fromitem.LeftJoin(opts.joins[i].RightSide)
 		}
 		fromitem = joinexpr.On(opts.joins[i].On)
 	}
